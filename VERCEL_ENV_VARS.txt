@@ -1,0 +1,20 @@
+VERCEL ENVIRONMENT VARIABLES
+============================
+
+Add these environment variables to your Vercel project:
+
+1. Go to: https://vercel.com/dashboard
+2. Select your "chatweb" project
+3. Go to Settings → Environment Variables
+4. Add these variables:
+
+Variable Name: NEXT_PUBLIC_API_URL
+Value: https://chatweb-backend-mbmu.onrender.com
+
+Variable Name: NEXT_PUBLIC_WS_URL
+Value: wss://chatweb-backend-mbmu.onrender.com
+
+5. Click "Save"
+6. Redeploy your frontend (go to Deployments → click the three dots on latest deployment → Redeploy)
+
+After redeployment, your frontend at https://chatweb-eight-delta.vercel.app/ will be connected to your backend!

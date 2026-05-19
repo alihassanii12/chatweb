@@ -75,16 +75,8 @@ export default function RoomPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   // Dynamic network host parameters
-  const [apiBase, setApiBase] = useState('http://127.0.0.1:8000');
-  const [wsBase, setWsBase] = useState('ws://127.0.0.1:8000');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const host = window.location.hostname;
-      setApiBase(`http://${host}:8000`);
-      setWsBase(`ws://${host}:8000`);
-    }
-  }, []);
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const wsBase = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
   
   // Persistent Room Media Library state
   const [sharedMedia, setSharedMedia] = useState<RoomMediaItem[]>([]);
