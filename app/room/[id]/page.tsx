@@ -117,6 +117,8 @@ export default function RoomPage() {
   const touchStartX = useRef<number | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const fullscreenChatInputRef = useRef<HTMLInputElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const fullscreenChatContainerRef = useRef<HTMLDivElement | null>(null);
   
   // Queue to ignore programmatic events and prevent recursion loops
   const ignoreNextEvents = useRef({ play: 0, pause: 0, seek: 0 });
@@ -607,9 +609,20 @@ export default function RoomPage() {
     };
   }, [roomId, user, wsBase]);
 
-  // Scroll Chat to bottom helper
+  // Scroll Chat to bottom helper (Direct container scroll avoids page-level jumping/bouncing caused by scrollIntoView)
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
-    chatEndRef.current?.scrollIntoView({ behavior });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior
+      });
+    }
+    if (fullscreenChatContainerRef.current) {
+      fullscreenChatContainerRef.current.scrollTo({
+        top: fullscreenChatContainerRef.current.scrollHeight,
+        behavior
+      });
+    }
   };
 
   useEffect(() => {
@@ -1561,7 +1574,7 @@ export default function RoomPage() {
                 </div>
                 
                 {/* Floating Chat Message Scroll */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                <div ref={fullscreenChatContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3">
                   {messages.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-4 my-auto min-h-[150px]">
                       <p className="text-gray-500 text-[10px]">No messages yet.</p>
@@ -1624,6 +1637,8 @@ export default function RoomPage() {
                   <button
                     type="submit"
                     disabled={!chatInput.trim()}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onTouchStart={(e) => e.preventDefault()}
                     className="p-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/30 text-white rounded-xl active:scale-95"
                   >
                     <Send className="w-3.5 h-3.5" />
@@ -1706,7 +1721,7 @@ export default function RoomPage() {
           {activeTab === 'chat' && (
             <div className="flex-1 flex flex-col overflow-hidden h-full">
               {/* Chat Message Scroll */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-6 my-auto min-h-[200px]">
                     <MessageSquare className="w-8 h-8 text-gray-600 mb-2" />
@@ -1784,6 +1799,8 @@ export default function RoomPage() {
                               <button
                                 key={emojiIndex}
                                 type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onTouchStart={(e) => e.preventDefault()}
                                 onClick={() => {
                                   setChatInput(prev => prev + emoji);
                                   handleChatInputChange(chatInput + emoji);
@@ -1812,6 +1829,8 @@ export default function RoomPage() {
                 {/* Emoji toggle button */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onTouchStart={(e) => e.preventDefault()}
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   className={`p-2.5 rounded-xl border border-white/5 transition-all cursor-pointer shrink-0 active:scale-95 flex items-center justify-center ${
                     showEmojiPicker 
@@ -1826,6 +1845,8 @@ export default function RoomPage() {
                 <button
                   type="submit"
                   disabled={!chatInput.trim()}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onTouchStart={(e) => e.preventDefault()}
                   className="p-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/30 text-white rounded-xl transition-all cursor-pointer shrink-0 active:scale-95"
                 >
                   <Send className="w-4 h-4" />
