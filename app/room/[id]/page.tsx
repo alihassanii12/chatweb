@@ -1486,85 +1486,114 @@ export default function RoomPage() {
             </div>
           </div>
 
-          {/* Core Player display box. On mobile has aspect-video ratio, on desktop scales relative to space */}
+          {/* Core Player display box. On mobile has aspect-video ratio, on desktop scales relative to space.
+              When in fullscreen mode, uses CSS Flexbox to layout video and chat drawer side-by-side dynamically. */}
           <div 
             ref={playerContainerRef} 
             onTouchStart={handlePlayerTouchStart}
             onTouchEnd={handlePlayerTouchEnd}
-            className="flex-1 flex items-center justify-center bg-black rounded-2xl border border-white/5 relative overflow-hidden aspect-video w-full lg:max-h-[85%] mx-auto shadow-2xl animate-fade-in shrink-0 lg:shrink"
+            className={isFullscreen 
+              ? "flex flex-row bg-black relative overflow-hidden w-full h-full shadow-2xl animate-fade-in items-stretch justify-between rounded-none border-0"
+              : "flex-1 flex items-center justify-center bg-black rounded-2xl border border-white/5 relative overflow-hidden aspect-video w-full lg:max-h-[85%] mx-auto shadow-2xl animate-fade-in shrink-0 lg:shrink"
+            }
           >
-            {uploading && (
-              <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-20">
-                <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
-                <h4 className="text-white text-sm font-bold mb-2">Uploading File to Server...</h4>
-                <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-400 transition-all duration-100" 
-                    style={{ width: `${uploadProgress}%` }}
-                  />
+            {/* Left Column: Video player area (fills container normally, transitions to dynamic width when chat is open in fullscreen) */}
+            <div className={`relative flex items-center justify-center bg-black h-full transition-all duration-300 ${
+              isFullscreen 
+                ? (showFullscreenChat ? 'w-[calc(100%-320px)]' : 'w-full') 
+                : 'w-full h-full'
+            }`}>
+              {uploading && (
+                <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-20">
+                  <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
+                  <h4 className="text-white text-sm font-bold mb-2">Uploading File to Server...</h4>
+                  <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-400 transition-all duration-100" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-gray-500 mt-2">{uploadProgress}% Complete</span>
                 </div>
-                <span className="text-[10px] text-gray-500 mt-2">{uploadProgress}% Complete</span>
-              </div>
-            )}
+              )}
 
-            {currentVideoUrl ? (
-              ytVideoId ? (
-                /* YouTube Official Iframe API integration wrapper */
-                <div key={ytVideoId} className="w-full h-full rounded-2xl overflow-hidden">
-                  <div id="yt-player" className="w-full h-full"></div>
-                </div>
-              ) : isEmbedUrl(currentVideoUrl) ? (
-                /* General Website Iframe Embed Mode (MovieBox, xHamster, custom embeds) */
-                <div key={currentVideoUrl} className="w-full h-full rounded-2xl overflow-hidden bg-black relative">
-                  <iframe
-                    src={getCleanEmbedUrl(currentVideoUrl)}
-                    className="w-full h-full border-0 absolute inset-0 bg-[#060608]"
-                    allow="autoplay; encrypted-media; gyroscope; picture-in-picture; clipboard-write"
-                    allowFullScreen
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups allow-presentation"
-                  ></iframe>
-                </div>
+              {currentVideoUrl ? (
+                ytVideoId ? (
+                  /* YouTube Official Iframe API integration wrapper */
+                  <div key={ytVideoId} className="w-full h-full overflow-hidden">
+                    <div id="yt-player" className="w-full h-full"></div>
+                  </div>
+                ) : isEmbedUrl(currentVideoUrl) ? (
+                  /* General Website Iframe Embed Mode (MovieBox, xHamster, custom embeds) */
+                  <div key={currentVideoUrl} className="w-full h-full overflow-hidden bg-black relative">
+                    <iframe
+                      src={getCleanEmbedUrl(currentVideoUrl)}
+                      className="w-full h-full border-0 absolute inset-0 bg-[#060608]"
+                      allow="autoplay; encrypted-media; gyroscope; picture-in-picture; clipboard-write"
+                      allowFullScreen
+                      sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups allow-presentation"
+                    ></iframe>
+                  </div>
+                ) : (
+                  /* HTML5 Direct Video streaming mode (Fixed source React rendering) */
+                  <video
+                    ref={videoRef}
+                    src={currentVideoUrl}
+                    controls
+                    playsInline
+                    preload="auto"
+                    controlsList="nodownload"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onPlay={onVideoPlay}
+                    onPause={onVideoPause}
+                    onSeeked={onVideoSeeked}
+                    className="w-full h-full object-contain"
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                )
               ) : (
-                /* HTML5 Direct Video streaming mode (Fixed source React rendering) */
-                <video
-                  ref={videoRef}
-                  src={currentVideoUrl}
-                  controls
-                  playsInline
-                  preload="auto"
-                  controlsList="nodownload"
-                  onContextMenu={(e) => e.preventDefault()}
-                  onPlay={onVideoPlay}
-                  onPause={onVideoPause}
-                  onSeeked={onVideoSeeked}
-                  className="w-full h-full object-contain"
-                >
-                  Your browser does not support the video tag.
-                </video>
-              )
-            ) : (
-              /* Landing display when player is empty - Ultra Premium Clean Lounge Screen */
-              <div className="flex flex-col items-center p-6 text-center max-w-lg mx-auto animate-fade-in">
-                <div className="p-4 bg-purple-600/10 border border-purple-500/25 rounded-2xl mb-4 animate-pulse shrink-0">
-                  <Tv className="w-10 h-10 text-purple-400" />
+                /* Landing display when player is empty - Ultra Premium Clean Lounge Screen */
+                <div className="flex flex-col items-center p-6 text-center max-w-lg mx-auto animate-fade-in">
+                  <div className="p-4 bg-purple-600/10 border border-purple-500/25 rounded-2xl mb-4 animate-pulse shrink-0">
+                    <Tv className="w-10 h-10 text-purple-400" />
+                  </div>
+                  <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide shrink-0">Lounge Screen Idle</h3>
+                  <p className="text-gray-400 text-xs max-w-xs leading-relaxed shrink-0">
+                    Paste a video link or upload a file above to start watching in perfect real-time sync with your partner.
+                  </p>
                 </div>
-                <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide shrink-0">Lounge Screen Idle</h3>
-                <p className="text-gray-400 text-xs max-w-xs leading-relaxed shrink-0">
-                  Paste a video link or upload a file above to start watching in perfect real-time sync with your partner.
-                </p>
-              </div>
-            )}
+              )}
 
-            {/* FULLSCREEN CHAT OVERLAY */}
+              {/* Floating Chat Button for fullscreen when drawer is closed (placed relative to the video viewport container) */}
+              {isFullscreen && !showFullscreenChat && (
+                <button
+                  type="button"
+                  onClick={() => setShowFullscreenChat(true)}
+                  className="absolute right-4 top-4 p-3.5 bg-purple-600/85 hover:bg-purple-600 hover:scale-105 active:scale-95 text-white rounded-full z-30 shadow-2xl backdrop-blur-sm transition-all flex items-center justify-center cursor-pointer animate-fade-in border border-white/10"
+                  title="Open Cinema Chat (Swipe left from right edge to open)"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {/* Right Column: Fullscreen Chat drawer (sits next to the video column in flex layout rather than overlapping it) */}
             {isFullscreen && (
               <div 
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
-                className={`absolute right-4 top-4 bottom-4 w-80 bg-black/75 backdrop-blur-md border border-white/10 rounded-2xl flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out transform ${
-                  showFullscreenChat ? 'translate-x-0 opacity-100' : 'translate-x-[calc(100%+16px)] opacity-0 pointer-events-none'
-                }`}
+                className={`bg-[#0d0d12] border-l border-white/5 flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
+                  showFullscreenChat 
+                    ? 'w-[320px] opacity-100 visible' 
+                    : 'w-0 opacity-0 invisible pointer-events-none'
+                } h-full shrink-0`}
               >
-                <div className="px-4 py-3 bg-black/40 border-b border-white/5 flex items-center justify-between">
+                <div className="px-4 py-3 bg-black/40 border-b border-white/5 flex items-center justify-between shrink-0">
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
                     <MessageSquare className="w-4 h-4 text-purple-400" />
                     Cinema Chat
@@ -1640,7 +1669,7 @@ export default function RoomPage() {
                 </div>
 
                 {/* Floating Chat Input form */}
-                <form onSubmit={handleSendChat} className="p-2 border-t border-white/5 bg-black/40 flex gap-1.5">
+                <form onSubmit={handleSendChat} className="p-2 border-t border-white/5 bg-black/40 flex gap-1.5 shrink-0">
                   <input
                     ref={fullscreenChatInputRef}
                     type="text"
@@ -1660,22 +1689,6 @@ export default function RoomPage() {
                   </button>
                 </form>
               </div>
-            )}
-
-            {/* Floating Chat Button for fullscreen when drawer is closed */}
-            {isFullscreen && !showFullscreenChat && (
-              <button
-                type="button"
-                onClick={() => setShowFullscreenChat(true)}
-                className="absolute right-4 top-4 p-3.5 bg-purple-600/85 hover:bg-purple-600 hover:scale-105 active:scale-95 text-white rounded-full z-30 shadow-2xl backdrop-blur-sm transition-all flex items-center justify-center cursor-pointer animate-fade-in border border-white/10"
-                title="Open Cinema Chat (Swipe left from right edge to open)"
-              >
-                <MessageSquare className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
-                </span>
-              </button>
             )}
           </div>
         </div>
