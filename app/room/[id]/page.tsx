@@ -115,6 +115,8 @@ export default function RoomPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
   const touchStartX = useRef<number | null>(null);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
+  const fullscreenChatInputRef = useRef<HTMLInputElement | null>(null);
   
   // Queue to ignore programmatic events and prevent recursion loops
   const ignoreNextEvents = useRef({ play: 0, pause: 0, seek: 0 });
@@ -271,13 +273,65 @@ export default function RoomPage() {
     }
   }, [router]);
 
-  // Track Fullscreen state natively
+  // Track Fullscreen state natively & handle landscape orientation lock
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+    const handleFullscreenChange = async () => {
+      const isFS = !!document.fullscreenElement;
+      setIsFullscreen(isFS);
+      
+      if (isFS) {
+        // Auto-show fullscreen chat drawer initially
+        setShowFullscreenChat(true);
+        
+        // Force screen orientation lock to landscape
+        const screenAny = screen as any;
+        if (screenAny.orientation && typeof screenAny.orientation.lock === 'function') {
+          try {
+            await screenAny.orientation.lock('landscape');
+          } catch (err) {
+            console.log('Screen orientation lock is not supported or was rejected:', err);
+          }
+        }
+      } else {
+        // Unlock orientation when exiting fullscreen
+        const screenAny = screen as any;
+        if (screenAny.orientation && typeof screenAny.orientation.unlock === 'function') {
+          try {
+            screenAny.orientation.unlock();
+          } catch (err) {
+            console.log('Screen orientation unlock error:', err);
+          }
+        }
+      }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Global click & touch handler to dismiss virtual keyboard when tapping outside inputs/forms/buttons
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        if (
+          !target.closest('input') && 
+          !target.closest('button') && 
+          !target.closest('form') && 
+          !target.closest('.emoji-picker-container') &&
+          !target.closest('[role="button"]')
+        ) {
+          (activeEl as HTMLElement).blur();
+        }
+      }
+    };
+    
+    document.addEventListener('mouseup', handleGlobalClick);
+    document.addEventListener('touchstart', handleGlobalClick);
+    return () => {
+      document.removeEventListener('mouseup', handleGlobalClick);
+      document.removeEventListener('touchstart', handleGlobalClick);
+    };
   }, []);
 
   // Track visual viewport height dynamically & lock scroll position (fixes virtual keyboard overlay & scroll shifts)
@@ -905,6 +959,15 @@ export default function RoomPage() {
     }
 
     setChatInput('');
+
+    // Focus preservation: Keep the input focused so virtual keyboard doesn't close
+    setTimeout(() => {
+      if (isFullscreen) {
+        fullscreenChatInputRef.current?.focus();
+      } else {
+        chatInputRef.current?.focus();
+      }
+    }, 30);
   };
 
   // Dynamic chat input change tracker to broadcast typing alerts with debounce/throttle protection
@@ -1283,19 +1346,13 @@ export default function RoomPage() {
       {/* Upper header */}
       <header className="px-6 py-3.5 bg-black/40 border-b border-white/5 flex items-center justify-between z-10 shrink-0">
         <div className="flex items-center gap-4">
-          <div className="p-2 bg-purple-600/10 border border-purple-500/20 rounded-xl">
+          <div className="p-2 bg-purple-600/10 border border-purple-500/20 rounded-xl relative">
             <Tv className="w-5 h-5 text-purple-400" />
-          </div>
-          
-          <div className="flex flex-col">
-            <h1 className="text-sm font-bold text-white flex items-center gap-2">
-              Cinema Lounge
-              {connected ? (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-ping"></span>
-              ) : (
-                <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
-              )}
-            </h1>
+            {connected ? (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            ) : (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+            )}
           </div>
         </div>
 
@@ -1557,6 +1614,7 @@ export default function RoomPage() {
                 {/* Floating Chat Input form */}
                 <form onSubmit={handleSendChat} className="p-2 border-t border-white/5 bg-black/40 flex gap-1.5">
                   <input
+                    ref={fullscreenChatInputRef}
                     type="text"
                     value={chatInput}
                     onChange={(e) => handleChatInputChange(e.target.value)}
@@ -1706,7 +1764,7 @@ export default function RoomPage() {
               <form onSubmit={handleSendChat} className="p-3 border-t border-white/5 bg-black/20 shrink-0 flex gap-2 relative">
                 {/* Emoji Picker Drawer */}
                 {showEmojiPicker && (
-                  <div className="absolute bottom-16 left-3 right-3 bg-[#16161f]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-30 p-3 h-64 flex flex-col overflow-hidden animate-fade-in">
+                  <div className="emoji-picker-container absolute bottom-16 left-3 right-3 bg-[#16161f]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-30 p-3 h-64 flex flex-col overflow-hidden animate-fade-in">
                     <div className="flex justify-between items-center pb-2 border-b border-white/5 mb-2 shrink-0">
                       <span className="text-[10px] font-extrabold tracking-wider text-purple-400 uppercase">Express Yourself</span>
                       <button
@@ -1743,6 +1801,7 @@ export default function RoomPage() {
                 )}
 
                 <input
+                  ref={chatInputRef}
                   type="text"
                   value={chatInput}
                   onChange={(e) => handleChatInputChange(e.target.value)}
