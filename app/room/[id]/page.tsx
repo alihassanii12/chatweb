@@ -276,7 +276,7 @@ export default function RoomPage() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Track visual viewport height dynamically (fixes virtual keyboard overlay on mobile)
+  // Track visual viewport height dynamically & lock scroll position (fixes virtual keyboard overlay & scroll shifts)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -286,11 +286,26 @@ export default function RoomPage() {
       } else {
         setViewportHeight('100dvh');
       }
+      // Force scroll reset
+      window.scrollTo(0, 0);
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
+      if ((e.target as HTMLElement).tagName === 'INPUT') {
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          document.body.scrollTop = 0;
+          document.documentElement.scrollTop = 0;
+        }, 50);
+      }
     };
 
     window.visualViewport?.addEventListener('resize', handleResize);
     window.visualViewport?.addEventListener('scroll', handleResize);
     window.addEventListener('resize', handleResize);
+    document.addEventListener('focusin', handleFocusIn);
     
     handleResize();
 
@@ -298,6 +313,7 @@ export default function RoomPage() {
       window.visualViewport?.removeEventListener('resize', handleResize);
       window.visualViewport?.removeEventListener('scroll', handleResize);
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('focusin', handleFocusIn);
     };
   }, []);
 
@@ -1155,7 +1171,7 @@ export default function RoomPage() {
 
   return (
     <div 
-      className="flex-1 flex flex-col bg-[#0a0a0c] overflow-hidden relative"
+      className="flex-1 flex flex-col bg-[#0a0a0c] overflow-hidden fixed inset-0 w-full"
       style={{ height: viewportHeight }}
     >
       <style dangerouslySetInnerHTML={{__html: `
