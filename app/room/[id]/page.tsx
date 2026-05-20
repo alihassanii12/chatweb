@@ -101,6 +101,10 @@ export default function RoomPage() {
   const [videoMuted, setVideoMuted] = useState(false);
   const [callStatus, setCallStatus] = useState<string>('Idle');
 
+  // Dynamic Viewport Height & Mobile Controls toggle
+  const [viewportHeight, setViewportHeight] = useState('100dvh');
+  const [showControlsMobile, setShowControlsMobile] = useState(false);
+
   // References
   const wsRef = useRef<WebSocket | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -270,6 +274,31 @@ export default function RoomPage() {
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Track visual viewport height dynamically (fixes virtual keyboard overlay on mobile)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setViewportHeight(`${window.visualViewport.height}px`);
+      } else {
+        setViewportHeight('100dvh');
+      }
+    };
+
+    window.visualViewport?.addEventListener('resize', handleResize);
+    window.visualViewport?.addEventListener('scroll', handleResize);
+    window.addEventListener('resize', handleResize);
+    
+    handleResize();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   // Fetch Room Media History List API
@@ -470,10 +499,22 @@ export default function RoomPage() {
     };
   }, [roomId, user, wsBase]);
 
-  // Scroll Chat to bottom
+  // Scroll Chat to bottom helper
+  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
+    chatEndRef.current?.scrollIntoView({ behavior });
+  };
+
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom('smooth');
   }, [messages]);
+
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      // Delay slightly to allow keyboard or tab layout transitions to complete
+      const timer = setTimeout(() => scrollToBottom('auto'), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [viewportHeight, activeTab]);
 
   // HTML5 Video Action Broadcast
   const broadcastVideoSync = (action: string, time: number, url?: string) => {
@@ -1113,7 +1154,10 @@ export default function RoomPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0a0a0c] h-screen overflow-hidden relative">
+    <div 
+      className="flex-1 flex flex-col bg-[#0a0a0c] overflow-hidden relative"
+      style={{ height: viewportHeight }}
+    >
       <style dangerouslySetInnerHTML={{__html: `
         body, html {
           overflow: hidden !important;
@@ -1167,15 +1211,29 @@ export default function RoomPage() {
             room?.is_playing ? 'opacity-30 scale-105 animate-pulse' : 'opacity-10 scale-100'
           }`} />
 
+          {/* Compact Toggle for Media Controls on Mobile */}
+          <div className="flex lg:hidden items-center justify-between mb-2 shrink-0">
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+              {room?.is_playing ? 'Playing synced video' : 'Screen Idle'}
+            </span>
+            <button
+              onClick={() => setShowControlsMobile(!showControlsMobile)}
+              className="px-3 py-1.5 bg-purple-600/10 border border-purple-500/30 text-purple-400 hover:text-purple-300 text-[10px] font-bold rounded-lg transition-all active:scale-95 flex items-center gap-1"
+            >
+              <Film className="w-3 h-3" />
+              <span>{showControlsMobile ? 'Hide Controls' : 'Change Video / Upload'}</span>
+            </button>
+          </div>
+
           {/* Load Video form input & File Uploader */}
-          <div className="mb-3 shrink-0 flex flex-col sm:flex-row gap-2.5">
+          <div className={`${showControlsMobile ? 'flex' : 'hidden lg:flex'} mb-3 shrink-0 flex flex-col sm:flex-row gap-2.5`}>
             <form onSubmit={handleLoadNewVideo} className="flex-1 flex gap-2">
               <input
                 type="text"
                 value={videoUrlInput}
                 onChange={(e) => setVideoUrlInput(e.target.value)}
                 placeholder="Paste direct MP4 video link or YouTube video URL"
-                className="flex-1 px-4 py-2.5 bg-black/30 border border-white/10 rounded-xl text-white text-xs placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+                className="flex-1 px-4 py-2.5 bg-black/30 border border-white/10 rounded-xl text-white text-base sm:text-xs placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
               />
               <button
                 type="submit"
@@ -1352,7 +1410,7 @@ export default function RoomPage() {
                     value={chatInput}
                     onChange={(e) => handleChatInputChange(e.target.value)}
                     placeholder="Type in fullscreen..."
-                    className="flex-1 px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-white text-[10px] placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                    className="flex-1 px-3 py-2 bg-black/40 border border-white/15 rounded-xl text-white text-base sm:text-[10px] placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all"
                   />
                   <button
                     type="submit"
@@ -1368,7 +1426,7 @@ export default function RoomPage() {
         </div>
 
         {/* Left Column (Desktop Left): Tabbed Sidebar Panel (Responsive inline-stacked bottom on mobile (order 2), side-aligned on desktop (order 1)) */}
-        <aside className="w-full lg:w-96 order-2 lg:order-1 border-t lg:border-t-0 lg:border-r border-white/5 bg-[#121217] flex flex-col shrink-0 flex-1 lg:flex-none lg:h-full overflow-hidden">
+        <aside className="w-full lg:w-96 order-2 lg:order-1 border-t lg:border-t-0 lg:border-r border-white/5 bg-[#121217] flex flex-col flex-1 lg:flex-none lg:h-full min-h-0 overflow-hidden">
           {/* Tab Selector */}
           <div className="flex border-b border-white/5 bg-black/20 shrink-0">
             <button
@@ -1515,7 +1573,7 @@ export default function RoomPage() {
                   value={chatInput}
                   onChange={(e) => handleChatInputChange(e.target.value)}
                   placeholder="Type message..."
-                  className="flex-1 px-3.5 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-xs placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  className="flex-1 px-3.5 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-base sm:text-xs placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 />
 
                 {/* Emoji toggle button */}
