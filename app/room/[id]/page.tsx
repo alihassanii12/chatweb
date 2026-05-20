@@ -102,7 +102,13 @@ export default function RoomPage() {
   const [callStatus, setCallStatus] = useState<string>('Idle');
 
   // Dynamic Viewport Height & Mobile Controls toggle
-  const [viewportHeight, setViewportHeight] = useState('100dvh');
+  const [viewportStyle, setViewportStyle] = useState<React.CSSProperties>({
+    height: '100dvh',
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100%',
+  });
   const [showControlsMobile, setShowControlsMobile] = useState(false);
   const [layoutMode, setLayoutMode] = useState<'both' | 'chat_only'>('both');
   const [showFullscreenChat, setShowFullscreenChat] = useState(true);
@@ -348,18 +354,27 @@ export default function RoomPage() {
 
     const handleResize = () => {
       if (window.visualViewport) {
-        const isMobile = window.visualViewport.width < 768;
-        const isKeyboard = window.visualViewport.height < 500 && isMobile;
+        const vv = window.visualViewport;
+        const isMobile = vv.width < 768;
+        const isKeyboard = vv.height < 500 && isMobile;
         setIsKeyboardOpen(isKeyboard);
         
-        if (isKeyboard) {
-          // On mobile keyboard open, keep height as 100% (or 100dvh) to avoid empty black space when Chrome scrolls the viewport
-          setViewportHeight('100%');
-        } else {
-          setViewportHeight(`${window.visualViewport.height}px`);
-        }
+        // Dynamically match visual viewport perfectly to eliminate any bouncing/shifting
+        setViewportStyle({
+          position: 'fixed',
+          top: `${vv.offsetTop}px`,
+          left: `${vv.offsetLeft}px`,
+          height: `${vv.height}px`,
+          width: `${vv.width}px`,
+        });
       } else {
-        setViewportHeight('100dvh');
+        setViewportStyle({
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '100dvh',
+          width: '100%',
+        });
         setIsKeyboardOpen(false);
       }
       
@@ -635,7 +650,7 @@ export default function RoomPage() {
       const timer = setTimeout(() => scrollToBottom('auto'), 150);
       return () => clearTimeout(timer);
     }
-  }, [viewportHeight, activeTab]);
+  }, [viewportStyle.height, activeTab]);
 
   // HTML5 Video Action Broadcast
   const broadcastVideoSync = (action: string, time: number, url?: string) => {
@@ -973,14 +988,14 @@ export default function RoomPage() {
 
     setChatInput('');
 
-    // Focus preservation: Keep the input focused so virtual keyboard doesn't close
-    setTimeout(() => {
-      if (isFullscreen) {
-        fullscreenChatInputRef.current?.focus();
-      } else {
-        chatInputRef.current?.focus();
-      }
-    }, 30);
+    // Focus preservation: Keep the input focused so virtual keyboard doesn't close.
+    // If it's already focused, do not call .focus() again to avoid virtual keyboard flickering/bouncing.
+    const activeInput = isFullscreen ? fullscreenChatInputRef.current : chatInputRef.current;
+    if (activeInput && document.activeElement !== activeInput) {
+      setTimeout(() => {
+        activeInput.focus();
+      }, 30);
+    }
   };
 
   // Dynamic chat input change tracker to broadcast typing alerts with debounce/throttle protection
@@ -1329,8 +1344,8 @@ export default function RoomPage() {
 
   return (
     <div 
-      className="flex-1 flex flex-col bg-[#0a0a0c] overflow-hidden fixed inset-0 w-full"
-      style={{ height: viewportHeight }}
+      className="flex-1 flex flex-col bg-[#0a0a0c] overflow-hidden"
+      style={viewportStyle}
     >
       <style dangerouslySetInnerHTML={{__html: `
         body, html {
