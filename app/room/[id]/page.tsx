@@ -285,12 +285,15 @@ export default function RoomPage() {
   useEffect(() => {
     const handleFullscreenChange = async () => {
       const isFS = !!document.fullscreenElement;
-      setIsFullscreen(isFS);
+      const isMobile = window.innerWidth < 1024;
+      if (!isMobile) {
+        setIsFullscreen(isFS);
+        if (isFS) {
+          setShowFullscreenChat(true);
+        }
+      }
       
       if (isFS) {
-        // Auto-show fullscreen chat drawer initially
-        setShowFullscreenChat(true);
-        
         // Force screen orientation lock to landscape
         const screenAny = screen as any;
         if (screenAny.orientation && typeof screenAny.orientation.lock === 'function') {
@@ -300,8 +303,8 @@ export default function RoomPage() {
             console.log('Screen orientation lock is not supported or was rejected:', err);
           }
         }
-      } else {
-        // Unlock orientation when exiting fullscreen
+      } else if (!isFS && !isMobile) {
+        // Unlock orientation when exiting fullscreen (desktop only)
         const screenAny = screen as any;
         if (screenAny.orientation && typeof screenAny.orientation.unlock === 'function') {
           try {
@@ -378,22 +381,7 @@ export default function RoomPage() {
         setIsKeyboardOpen(false);
       }
       
-      // Force scroll reset instantly and staggered to combat keyboard animation shifts
       resetScroll();
-      const timeouts = [10, 50, 100, 150, 200, 300, 400, 600];
-      timeouts.forEach(delay => {
-        setTimeout(resetScroll, delay);
-      });
-    };
-
-    const handleFocusIn = (e: FocusEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT') {
-        resetScroll();
-        const timeouts = [10, 50, 100, 150, 200, 300, 400, 600];
-        timeouts.forEach(delay => {
-          setTimeout(resetScroll, delay);
-        });
-      }
     };
 
     const handleWindowScroll = () => {
@@ -406,7 +394,6 @@ export default function RoomPage() {
     window.visualViewport?.addEventListener('scroll', handleResize);
     window.addEventListener('resize', handleResize);
     window.addEventListener('scroll', handleWindowScroll, { passive: true });
-    document.addEventListener('focusin', handleFocusIn);
     
     handleResize();
 
@@ -415,7 +402,6 @@ export default function RoomPage() {
       window.visualViewport?.removeEventListener('scroll', handleResize);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('scroll', handleWindowScroll);
-      document.removeEventListener('focusin', handleFocusIn);
     };
   }, []);
 
@@ -1052,12 +1038,37 @@ export default function RoomPage() {
   const toggleFullscreen = () => {
     if (!playerContainerRef.current) return;
     
-    if (!document.fullscreenElement) {
-      playerContainerRef.current.requestFullscreen().catch((err) => {
-        console.error('Error enabling fullscreen', err);
+    const isMobile = window.innerWidth < 1024;
+    
+    if (isMobile) {
+      // Mobile: Use simulated fullscreen to avoid native fullscreen virtual keyboard layout issues
+      setIsFullscreen(prev => {
+        const next = !prev;
+        if (next) {
+          setShowFullscreenChat(true);
+          // Try to lock screen orientation to landscape on mobile
+          const screenAny = screen as any;
+          if (screenAny.orientation && typeof screenAny.orientation.lock === 'function') {
+            screenAny.orientation.lock('landscape').catch(() => {});
+          }
+        } else {
+          // Unlock orientation when exiting fullscreen
+          const screenAny = screen as any;
+          if (screenAny.orientation && typeof screenAny.orientation.unlock === 'function') {
+            screenAny.orientation.unlock();
+          }
+        }
+        return next;
       });
     } else {
-      document.exitFullscreen();
+      // Desktop: Use native browser fullscreen
+      if (!document.fullscreenElement) {
+        playerContainerRef.current.requestFullscreen().catch((err) => {
+          console.error('Error enabling fullscreen', err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
     }
   };
 
@@ -1071,8 +1082,8 @@ export default function RoomPage() {
     const touchEndX = e.changedTouches[0].clientX;
     const diffX = touchEndX - touchStartX.current;
     
-    // Swipe right (close panel)
-    if (diffX > 60) {
+    // Swipe left (towards left edge) to close open chat drawer
+    if (diffX < -60) {
       setShowFullscreenChat(false);
     }
     touchStartX.current = null;
@@ -1088,15 +1099,15 @@ export default function RoomPage() {
     const touchEndX = e.changedTouches[0].clientX;
     const diffX = touchEndX - touchStartX.current;
     
-    // Swipe right to close open chat
-    if (showFullscreenChat && diffX > 60) {
+    const containerWidth = playerContainerRef.current?.clientWidth || window.innerWidth;
+    
+    // Swipe left (towards left edge) to close open chat
+    if (showFullscreenChat && diffX < -60) {
       setShowFullscreenChat(false);
     }
-    // Swipe left from right 35% edge of screen to open chat
-    else if (!showFullscreenChat && diffX < -60) {
-      const containerWidth = playerContainerRef.current?.clientWidth || window.innerWidth;
-      const startXFromRight = containerWidth - touchStartX.current;
-      if (startXFromRight < containerWidth * 0.35) {
+    // Swipe right from left 25% edge of screen to open chat
+    else if (!showFullscreenChat && diffX > 60) {
+      if (touchStartX.current < containerWidth * 0.25) {
         setShowFullscreenChat(true);
       }
     }
@@ -1420,8 +1431,8 @@ export default function RoomPage() {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         {/* Left Column (Desktop Right): Synced Video Player. Stacked top on mobile (order 1), fills right side on desktop (order 2) */}
         {layoutMode === 'both' && (
-          <div className={`w-full lg:flex-1 order-1 lg:order-2 flex flex-col lg:justify-between overflow-hidden relative transition-all duration-300 ${
-            isKeyboardOpen ? 'h-0 opacity-0 pointer-events-none p-0 overflow-hidden shrink-0' : 'p-3 sm:p-5 shrink-0 lg:shrink'
+          <div className={`w-full lg:flex-1 order-1 lg:order-2 flex flex-col lg:justify-between overflow-hidden relative ${
+            isKeyboardOpen ? 'hidden' : 'p-3 sm:p-5 shrink-0 lg:shrink'
           }`}>
           {/* Ambient Cinema Hue Backlight Glow */}
           <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] aspect-video bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 rounded-[50px] filter blur-[100px] transition-all duration-1000 -z-10 ${
@@ -1493,101 +1504,17 @@ export default function RoomPage() {
             onTouchStart={handlePlayerTouchStart}
             onTouchEnd={handlePlayerTouchEnd}
             className={isFullscreen 
-              ? "flex flex-row bg-black relative overflow-hidden w-full h-full shadow-2xl animate-fade-in items-stretch justify-between rounded-none border-0"
+              ? "fixed z-[100] flex flex-row bg-black overflow-hidden shadow-2xl animate-fade-in items-stretch justify-between rounded-none border-0"
               : "flex-1 flex items-center justify-center bg-black rounded-2xl border border-white/5 relative overflow-hidden aspect-video w-full lg:max-h-[85%] mx-auto shadow-2xl animate-fade-in shrink-0 lg:shrink"
             }
+            style={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 1024 ? viewportStyle : undefined}
           >
-            {/* Left Column: Video player area (fills container normally, transitions to dynamic width when chat is open in fullscreen) */}
-            <div className={`relative flex items-center justify-center bg-black h-full transition-all duration-300 ${
-              isFullscreen 
-                ? (showFullscreenChat ? 'w-[calc(100%-320px)]' : 'w-full') 
-                : 'w-full h-full'
-            }`}>
-              {uploading && (
-                <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-20">
-                  <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
-                  <h4 className="text-white text-sm font-bold mb-2">Uploading File to Server...</h4>
-                  <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-emerald-400 transition-all duration-100" 
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-gray-500 mt-2">{uploadProgress}% Complete</span>
-                </div>
-              )}
-
-              {currentVideoUrl ? (
-                ytVideoId ? (
-                  /* YouTube Official Iframe API integration wrapper */
-                  <div key={ytVideoId} className="w-full h-full overflow-hidden">
-                    <div id="yt-player" className="w-full h-full"></div>
-                  </div>
-                ) : isEmbedUrl(currentVideoUrl) ? (
-                  /* General Website Iframe Embed Mode (MovieBox, xHamster, custom embeds) */
-                  <div key={currentVideoUrl} className="w-full h-full overflow-hidden bg-black relative">
-                    <iframe
-                      src={getCleanEmbedUrl(currentVideoUrl)}
-                      className="w-full h-full border-0 absolute inset-0 bg-[#060608]"
-                      allow="autoplay; encrypted-media; gyroscope; picture-in-picture; clipboard-write"
-                      allowFullScreen
-                      sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups allow-presentation"
-                    ></iframe>
-                  </div>
-                ) : (
-                  /* HTML5 Direct Video streaming mode (Fixed source React rendering) */
-                  <video
-                    ref={videoRef}
-                    src={currentVideoUrl}
-                    controls
-                    playsInline
-                    preload="auto"
-                    controlsList="nodownload"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onPlay={onVideoPlay}
-                    onPause={onVideoPause}
-                    onSeeked={onVideoSeeked}
-                    className="w-full h-full object-contain"
-                  >
-                    Your browser does not support the video tag.
-                  </video>
-                )
-              ) : (
-                /* Landing display when player is empty - Ultra Premium Clean Lounge Screen */
-                <div className="flex flex-col items-center p-6 text-center max-w-lg mx-auto animate-fade-in">
-                  <div className="p-4 bg-purple-600/10 border border-purple-500/25 rounded-2xl mb-4 animate-pulse shrink-0">
-                    <Tv className="w-10 h-10 text-purple-400" />
-                  </div>
-                  <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide shrink-0">Lounge Screen Idle</h3>
-                  <p className="text-gray-400 text-xs max-w-xs leading-relaxed shrink-0">
-                    Paste a video link or upload a file above to start watching in perfect real-time sync with your partner.
-                  </p>
-                </div>
-              )}
-
-              {/* Floating Chat Button for fullscreen when drawer is closed (placed relative to the video viewport container) */}
-              {isFullscreen && !showFullscreenChat && (
-                <button
-                  type="button"
-                  onClick={() => setShowFullscreenChat(true)}
-                  className="absolute right-4 top-4 p-3.5 bg-purple-600/85 hover:bg-purple-600 hover:scale-105 active:scale-95 text-white rounded-full z-30 shadow-2xl backdrop-blur-sm transition-all flex items-center justify-center cursor-pointer animate-fade-in border border-white/10"
-                  title="Open Cinema Chat (Swipe left from right edge to open)"
-                >
-                  <MessageSquare className="w-5 h-5" />
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
-                  </span>
-                </button>
-              )}
-            </div>
-
-            {/* Right Column: Fullscreen Chat drawer (sits next to the video column in flex layout rather than overlapping it) */}
+            {/* Left Column: Fullscreen Chat drawer */}
             {isFullscreen && (
               <div 
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
-                className={`bg-[#0d0d12] border-l border-white/5 flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
+                className={`bg-[#0d0d12] border-r border-white/5 flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
                   showFullscreenChat 
                     ? 'w-[320px] opacity-100 visible' 
                     : 'w-0 opacity-0 invisible pointer-events-none'
@@ -1603,7 +1530,7 @@ export default function RoomPage() {
                       type="button"
                       onClick={() => setShowFullscreenChat(false)} 
                       className="p-1 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded transition-all cursor-pointer"
-                      title="Hide Chat (Swipe right to close)"
+                      title="Hide Chat (Swipe left to close)"
                     >
                       <Minimize className="w-3.5 h-3.5" />
                     </button>
@@ -1690,12 +1617,92 @@ export default function RoomPage() {
                 </form>
               </div>
             )}
+
+            {/* Right Column: Video player area (fills container normally, transitions to dynamic width when chat is open in fullscreen) */}
+            <div className={`relative flex items-center justify-center bg-black h-full transition-all duration-300 ${
+              isFullscreen 
+                ? (showFullscreenChat ? 'w-[calc(100%-320px)]' : 'w-full') 
+                : 'w-full h-full'
+            }`}>
+              {uploading && (
+                <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-20">
+                  <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mb-4" />
+                  <h4 className="text-white text-sm font-bold mb-2">Uploading File to Server...</h4>
+                  <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-400 transition-all duration-100" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-gray-500 mt-2">{uploadProgress}% Complete</span>
+                </div>
+              )}
+
+              {currentVideoUrl ? (
+                ytVideoId ? (
+                  /* YouTube Official Iframe API integration wrapper */
+                  <div key={ytVideoId} className="w-full h-full overflow-hidden">
+                    <div id="yt-player" className="w-full h-full"></div>
+                  </div>
+                ) : isEmbedUrl(currentVideoUrl) ? (
+                  /* General Website Iframe Embed Mode */
+                  <div key={currentVideoUrl} className="w-full h-full overflow-hidden bg-black relative">
+                    <iframe
+                      src={getCleanEmbedUrl(currentVideoUrl)}
+                      className="w-full h-full border-0 absolute inset-0 bg-[#060608]"
+                      allow="autoplay; encrypted-media; gyroscope; picture-in-picture; clipboard-write"
+                      allowFullScreen
+                      sandbox="allow-same-origin allow-scripts allow-forms allow-pointer-lock allow-popups allow-presentation"
+                    ></iframe>
+                  </div>
+                ) : (
+                  /* HTML5 Direct Video streaming mode */
+                  <video
+                    ref={videoRef}
+                    src={currentVideoUrl}
+                    controls
+                    playsInline
+                    preload="auto"
+                    controlsList="nodownload"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onPlay={onVideoPlay}
+                    onPause={onVideoPause}
+                    onSeeked={onVideoSeeked}
+                    className="w-full h-full object-contain"
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                )
+              ) : (
+                /* Landing display when player is empty */
+                <div className="flex flex-col items-center p-6 text-center max-w-lg mx-auto animate-fade-in">
+                  <div className="p-4 bg-purple-600/10 border border-purple-500/25 rounded-2xl mb-4 animate-pulse shrink-0">
+                    <Tv className="w-10 h-10 text-purple-400" />
+                  </div>
+                  <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide shrink-0">Lounge Screen Idle</h3>
+                  <p className="text-gray-400 text-xs max-w-xs leading-relaxed shrink-0">
+                    Paste a video link or upload a file above to start watching in perfect real-time sync with your partner.
+                  </p>
+                </div>
+              )}
+
+              {/* Minimalist vertical handle line docked on the left screen edge when drawer is minimized */}
+              {isFullscreen && !showFullscreenChat && (
+                <div
+                  onClick={() => setShowFullscreenChat(true)}
+                  className="absolute left-0 top-0 bottom-0 w-3 hover:w-5 bg-gradient-to-r from-purple-600/70 to-purple-600/10 hover:from-purple-500 hover:to-purple-600 border-r border-purple-500/20 flex items-center justify-center z-30 cursor-pointer transition-all duration-300 group"
+                  title="Swipe right or tap to open Cinema Chat"
+                >
+                  <div className="w-[3px] h-20 bg-purple-400/80 group-hover:bg-white rounded-full animate-pulse transition-colors" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
         )}
 
         {/* Left Column (Desktop Left): Tabbed Sidebar Panel (Responsive inline-stacked bottom on mobile (order 2), side-aligned on desktop (order 1)) */}
-        <aside className={`w-full order-2 lg:order-1 border-white/5 bg-[#121217] flex flex-col flex-1 min-h-0 overflow-hidden transition-all duration-300 ${
+        <aside className={`w-full order-2 lg:order-1 border-white/5 bg-[#121217] flex flex-col flex-1 min-h-0 overflow-hidden ${
           layoutMode === 'both' 
             ? 'lg:w-96 border-t lg:border-t-0 lg:border-r lg:flex-none lg:h-full' 
             : 'w-full lg:w-full border-t-0 border-r-0 lg:h-full'
