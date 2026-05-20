@@ -104,6 +104,9 @@ export default function RoomPage() {
   // Dynamic Viewport Height & Mobile Controls toggle
   const [viewportHeight, setViewportHeight] = useState('100dvh');
   const [showControlsMobile, setShowControlsMobile] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<'both' | 'chat_only'>('both');
+  const [showFullscreenChat, setShowFullscreenChat] = useState(true);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   // References
   const wsRef = useRef<WebSocket | null>(null);
@@ -111,6 +114,7 @@ export default function RoomPage() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
+  const touchStartX = useRef<number | null>(null);
   
   // Queue to ignore programmatic events and prevent recursion loops
   const ignoreNextEvents = useRef({ play: 0, pause: 0, seek: 0 });
@@ -283,8 +287,10 @@ export default function RoomPage() {
     const handleResize = () => {
       if (window.visualViewport) {
         setViewportHeight(`${window.visualViewport.height}px`);
+        setIsKeyboardOpen(window.visualViewport.height < 500 && window.visualViewport.width < 768);
       } else {
         setViewportHeight('100dvh');
+        setIsKeyboardOpen(false);
       }
       // Force scroll reset
       window.scrollTo(0, 0);
@@ -932,6 +938,48 @@ export default function RoomPage() {
     }
   };
 
+  // Fullscreen touch gesture handlers (swipe to close/open chat drawer)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = touchEndX - touchStartX.current;
+    
+    // Swipe right (close panel)
+    if (diffX > 60) {
+      setShowFullscreenChat(false);
+    }
+    touchStartX.current = null;
+  };
+
+  const handlePlayerTouchStart = (e: React.TouchEvent) => {
+    if (!isFullscreen) return;
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handlePlayerTouchEnd = (e: React.TouchEvent) => {
+    if (!isFullscreen || touchStartX.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = touchEndX - touchStartX.current;
+    
+    // Swipe right to close open chat
+    if (showFullscreenChat && diffX > 60) {
+      setShowFullscreenChat(false);
+    }
+    // Swipe left from right 35% edge of screen to open chat
+    else if (!showFullscreenChat && diffX < -60) {
+      const containerWidth = playerContainerRef.current?.clientWidth || window.innerWidth;
+      const startXFromRight = containerWidth - touchStartX.current;
+      if (startXFromRight < containerWidth * 0.35) {
+        setShowFullscreenChat(true);
+      }
+    }
+    touchStartX.current = null;
+  };
+
   // WebRTC Calling Engine
   const startCall = async () => {
     if (!wsRef.current) return;
@@ -1160,6 +1208,8 @@ export default function RoomPage() {
     }
   };
 
+
+
   if (!user || !room) {
     return (
       <div className="flex-1 flex flex-col justify-center items-center bg-[#0a0a0c]">
@@ -1216,12 +1266,43 @@ export default function RoomPage() {
             </h1>
           </div>
         </div>
+
+        {/* Dynamic Layout Mode Selector */}
+        <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 select-none gap-1 shrink-0">
+          <button
+            onClick={() => setLayoutMode('both')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+              layoutMode === 'both'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Video className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Video + Chat</span>
+            <span className="sm:hidden">Both</span>
+          </button>
+          <button
+            onClick={() => setLayoutMode('chat_only')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+              layoutMode === 'chat_only'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Chat Only</span>
+            <span className="sm:hidden">Chat</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Split workspace - Ultra Responsive stacked on mobile, side-by-side on desktop */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         {/* Left Column (Desktop Right): Synced Video Player. Stacked top on mobile (order 1), fills right side on desktop (order 2) */}
-        <div className="w-full lg:flex-1 order-1 lg:order-2 flex flex-col p-3 sm:p-5 shrink-0 lg:shrink lg:justify-between overflow-hidden relative">
+        {layoutMode === 'both' && (
+          <div className={`w-full lg:flex-1 order-1 lg:order-2 flex flex-col lg:justify-between overflow-hidden relative transition-all duration-300 ${
+            isKeyboardOpen ? 'h-0 opacity-0 pointer-events-none p-0 overflow-hidden shrink-0' : 'p-3 sm:p-5 shrink-0 lg:shrink'
+          }`}>
           {/* Ambient Cinema Hue Backlight Glow */}
           <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] aspect-video bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 rounded-[50px] filter blur-[100px] transition-all duration-1000 -z-10 ${
             room?.is_playing ? 'opacity-30 scale-105 animate-pulse' : 'opacity-10 scale-100'
@@ -1288,6 +1369,8 @@ export default function RoomPage() {
           {/* Core Player display box. On mobile has aspect-video ratio, on desktop scales relative to space */}
           <div 
             ref={playerContainerRef} 
+            onTouchStart={handlePlayerTouchStart}
+            onTouchEnd={handlePlayerTouchEnd}
             className="flex-1 flex items-center justify-center bg-black rounded-2xl border border-white/5 relative overflow-hidden aspect-video w-full lg:max-h-[85%] mx-auto shadow-2xl animate-fade-in shrink-0 lg:shrink"
           >
             {uploading && (
@@ -1354,18 +1437,35 @@ export default function RoomPage() {
 
             {/* FULLSCREEN CHAT OVERLAY */}
             {isFullscreen && (
-              <div className="absolute right-4 top-4 bottom-4 w-80 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300">
+              <div 
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                className={`absolute right-4 top-4 bottom-4 w-80 bg-black/75 backdrop-blur-md border border-white/10 rounded-2xl flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out transform ${
+                  showFullscreenChat ? 'translate-x-0 opacity-100' : 'translate-x-[calc(100%+16px)] opacity-0 pointer-events-none'
+                }`}
+              >
                 <div className="px-4 py-3 bg-black/40 border-b border-white/5 flex items-center justify-between">
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
                     <MessageSquare className="w-4 h-4 text-purple-400" />
                     Cinema Chat
                   </span>
-                  <button 
-                    onClick={toggleFullscreen} 
-                    className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-gray-400 hover:text-white"
-                  >
-                    Exit Fullscreen
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setShowFullscreenChat(false)} 
+                      className="p-1 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded transition-all cursor-pointer"
+                      title="Hide Chat (Swipe right to close)"
+                    >
+                      <Minimize className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={toggleFullscreen} 
+                      className="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-gray-400 hover:text-white cursor-pointer"
+                    >
+                      Exit
+                    </button>
+                  </div>
                 </div>
                 
                 {/* Floating Chat Message Scroll */}
@@ -1438,11 +1538,32 @@ export default function RoomPage() {
                 </form>
               </div>
             )}
+
+            {/* Floating Chat Button for fullscreen when drawer is closed */}
+            {isFullscreen && !showFullscreenChat && (
+              <button
+                type="button"
+                onClick={() => setShowFullscreenChat(true)}
+                className="absolute right-4 top-4 p-3.5 bg-purple-600/85 hover:bg-purple-600 hover:scale-105 active:scale-95 text-white rounded-full z-30 shadow-2xl backdrop-blur-sm transition-all flex items-center justify-center cursor-pointer animate-fade-in border border-white/10"
+                title="Open Cinema Chat (Swipe left from right edge to open)"
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                </span>
+              </button>
+            )}
           </div>
         </div>
+        )}
 
         {/* Left Column (Desktop Left): Tabbed Sidebar Panel (Responsive inline-stacked bottom on mobile (order 2), side-aligned on desktop (order 1)) */}
-        <aside className="w-full lg:w-96 order-2 lg:order-1 border-t lg:border-t-0 lg:border-r border-white/5 bg-[#121217] flex flex-col flex-1 lg:flex-none lg:h-full min-h-0 overflow-hidden">
+        <aside className={`w-full order-2 lg:order-1 border-white/5 bg-[#121217] flex flex-col flex-1 min-h-0 overflow-hidden transition-all duration-300 ${
+          layoutMode === 'both' 
+            ? 'lg:w-96 border-t lg:border-t-0 lg:border-r lg:flex-none lg:h-full' 
+            : 'w-full lg:w-full border-t-0 border-r-0 lg:h-full'
+        }`}>
           {/* Tab Selector */}
           <div className="flex border-b border-white/5 bg-black/20 shrink-0">
             <button
