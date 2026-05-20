@@ -292,8 +292,16 @@ export default function RoomPage() {
 
     const handleResize = () => {
       if (window.visualViewport) {
-        setViewportHeight(`${window.visualViewport.height}px`);
-        setIsKeyboardOpen(window.visualViewport.height < 500 && window.visualViewport.width < 768);
+        const isMobile = window.visualViewport.width < 768;
+        const isKeyboard = window.visualViewport.height < 500 && isMobile;
+        setIsKeyboardOpen(isKeyboard);
+        
+        if (isKeyboard) {
+          // On mobile keyboard open, keep height as 100% (or 100dvh) to avoid empty black space when Chrome scrolls the viewport
+          setViewportHeight('100%');
+        } else {
+          setViewportHeight(`${window.visualViewport.height}px`);
+        }
       } else {
         setViewportHeight('100dvh');
         setIsKeyboardOpen(false);
@@ -339,6 +347,13 @@ export default function RoomPage() {
       document.removeEventListener('focusin', handleFocusIn);
     };
   }, []);
+
+  // Keep activeTab set to 'chat' when in chat_only layout mode
+  useEffect(() => {
+    if (layoutMode === 'chat_only') {
+      setActiveTab('chat');
+    }
+  }, [layoutMode]);
 
   // Fetch Room Media History List API
   const fetchRoomMediaHistory = async () => {
@@ -1299,7 +1314,10 @@ export default function RoomPage() {
             <span className="sm:hidden">Both</span>
           </button>
           <button
-            onClick={() => setLayoutMode('chat_only')}
+            onClick={() => {
+              setLayoutMode('chat_only');
+              setActiveTab('chat');
+            }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
               layoutMode === 'chat_only'
                 ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
@@ -1582,47 +1600,49 @@ export default function RoomPage() {
             : 'w-full lg:w-full border-t-0 border-r-0 lg:h-full'
         }`}>
           {/* Tab Selector */}
-          <div className="flex border-b border-white/5 bg-black/20 shrink-0">
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer relative ${
-                activeTab === 'chat' 
-                  ? 'border-purple-500 text-white bg-white/5' 
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Chat</span>
-              {partnerIsTyping && activeTab !== 'chat' && (
-                <span className="absolute right-4 top-3.5 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('library')}
-              className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                activeTab === 'library' 
-                  ? 'border-purple-500 text-white bg-white/5' 
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Film className="w-3.5 h-3.5" />
-              <span>Library</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('call')}
-              className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                activeTab === 'call' 
-                  ? 'border-purple-500 text-white bg-white/5' 
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Video className="w-3.5 h-3.5" />
-              <span>Call</span>
-            </button>
-          </div>
+          {layoutMode === 'both' && (
+            <div className="flex border-b border-white/5 bg-black/20 shrink-0">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer relative ${
+                  activeTab === 'chat' 
+                    ? 'border-purple-500 text-white bg-white/5' 
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Chat</span>
+                {partnerIsTyping && activeTab !== 'chat' && (
+                  <span className="absolute right-4 top-3.5 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('library')}
+                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'library' 
+                    ? 'border-purple-500 text-white bg-white/5' 
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <Film className="w-3.5 h-3.5" />
+                <span>Library</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('call')}
+                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'call' 
+                    ? 'border-purple-500 text-white bg-white/5' 
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>Call</span>
+              </button>
+            </div>
+          )}
 
           {/* TAB CONTENT: Chat panel */}
           {activeTab === 'chat' && (
