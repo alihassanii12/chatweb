@@ -113,41 +113,13 @@ export default function RoomPage() {
   const [layoutMode, setLayoutMode] = useState<'both' | 'chat_only'>('both');
   const [showFullscreenChat, setShowFullscreenChat] = useState(true);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
 
   // Dynamic Simulated Mobile Fullscreen style selection
   const getFullscreenStyle = (): React.CSSProperties | undefined => {
     if (!isFullscreen || typeof window === 'undefined') return undefined;
-    
     const isMobile = window.innerWidth < 1024;
-    if (!isMobile) return undefined; // Desktop uses native fullscreen
-    
-    const isPortrait = window.innerWidth < window.innerHeight;
-    if (isPortrait) {
-      const vv = window.visualViewport;
-      if (vv) {
-        return {
-          position: 'fixed',
-          top: `${vv.offsetTop}px`,
-          left: `${vv.offsetLeft + vv.width}px`,
-          width: `${vv.height}px`,
-          height: `${vv.width}px`,
-          transform: 'rotate(90deg)',
-          transformOrigin: 'top left',
-        };
-      }
-      return {
-        position: 'fixed',
-        top: 0,
-        left: '100vw',
-        width: '100vh',
-        height: '100vw',
-        transform: 'rotate(90deg)',
-        transformOrigin: 'top left',
-      };
-    } else {
-      // Landscape: standard fit
-      return viewportStyle;
-    }
+    return isMobile ? viewportStyle : undefined;
   };
 
   // References
@@ -157,6 +129,7 @@ export default function RoomPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playerContainerRef = useRef<HTMLDivElement | null>(null);
   const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const fullscreenChatInputRef = useRef<HTMLInputElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -392,6 +365,7 @@ export default function RoomPage() {
     };
 
     const handleResize = () => {
+      setIsPortrait(window.innerWidth < window.innerHeight);
       if (window.visualViewport) {
         const vv = window.visualViewport;
         const isMobile = vv.width < 768;
@@ -1111,43 +1085,72 @@ export default function RoomPage() {
   // Fullscreen touch gesture handlers (swipe to close/open chat drawer)
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
+    if (touchStartX.current === null || touchStartY.current === null) return;
     const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
     const diffX = touchEndX - touchStartX.current;
+    const diffY = touchEndY - touchStartY.current;
     
-    // Swipe left (towards left edge) to close open chat drawer
-    if (diffX < -60) {
-      setShowFullscreenChat(false);
+    if (isPortrait) {
+      // Swipe down to close chat drawer
+      if (diffY > 60) {
+        setShowFullscreenChat(false);
+      }
+    } else {
+      // Swipe left (towards left edge) to close open chat drawer
+      if (diffX < -60) {
+        setShowFullscreenChat(false);
+      }
     }
     touchStartX.current = null;
+    touchStartY.current = null;
   };
 
   const handlePlayerTouchStart = (e: React.TouchEvent) => {
     if (!isFullscreen) return;
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
 
   const handlePlayerTouchEnd = (e: React.TouchEvent) => {
-    if (!isFullscreen || touchStartX.current === null) return;
+    if (!isFullscreen || touchStartX.current === null || touchStartY.current === null) return;
     const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
     const diffX = touchEndX - touchStartX.current;
+    const diffY = touchEndY - touchStartY.current;
     
     const containerWidth = playerContainerRef.current?.clientWidth || window.innerWidth;
+    const containerHeight = playerContainerRef.current?.clientHeight || window.innerHeight;
     
-    // Swipe left (towards left edge) to close open chat
-    if (showFullscreenChat && diffX < -60) {
-      setShowFullscreenChat(false);
-    }
-    // Swipe right from left 25% edge of screen to open chat
-    else if (!showFullscreenChat && diffX > 60) {
-      if (touchStartX.current < containerWidth * 0.25) {
-        setShowFullscreenChat(true);
+    if (isPortrait) {
+      // Swipe down to close open chat
+      if (showFullscreenChat && diffY > 60) {
+        setShowFullscreenChat(false);
+      }
+      // Swipe up from bottom 25% edge of screen to open chat
+      else if (!showFullscreenChat && diffY < -60) {
+        if (touchStartY.current > containerHeight * 0.75) {
+          setShowFullscreenChat(true);
+        }
+      }
+    } else {
+      // Swipe left (towards left edge) to close open chat
+      if (showFullscreenChat && diffX < -60) {
+        setShowFullscreenChat(false);
+      }
+      // Swipe right from left 25% edge of screen to open chat
+      else if (!showFullscreenChat && diffX > 60) {
+        if (touchStartX.current < containerWidth * 0.25) {
+          setShowFullscreenChat(true);
+        }
       }
     }
     touchStartX.current = null;
+    touchStartY.current = null;
   };
 
   // WebRTC Calling Engine
@@ -1540,7 +1543,7 @@ export default function RoomPage() {
             onTouchStart={handlePlayerTouchStart}
             onTouchEnd={handlePlayerTouchEnd}
             className={isFullscreen 
-              ? "fixed z-[100] flex flex-row bg-black overflow-hidden shadow-2xl animate-fade-in items-stretch justify-between rounded-none border-0"
+              ? `fixed z-[100] flex ${isPortrait ? 'flex-col' : 'flex-row'} bg-black overflow-hidden shadow-2xl animate-fade-in items-stretch justify-between rounded-none border-0`
               : "flex-1 flex items-center justify-center bg-black rounded-2xl border border-white/5 relative overflow-hidden aspect-video w-full lg:max-h-[85%] mx-auto shadow-2xl animate-fade-in shrink-0 lg:shrink"
             }
             style={getFullscreenStyle()}
@@ -1550,11 +1553,11 @@ export default function RoomPage() {
               <div 
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
-                className={`bg-[#0d0d12] border-r border-white/5 flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
+                className={`bg-[#0d0d12] ${isPortrait ? 'border-t' : 'border-r'} border-white/5 flex flex-col z-30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
                   showFullscreenChat 
-                    ? 'w-[320px] opacity-100 visible' 
-                    : 'w-0 opacity-0 invisible pointer-events-none'
-                } h-full shrink-0`}
+                    ? (isPortrait ? 'w-full h-[45%] opacity-100 visible' : 'w-[320px] h-full opacity-100 visible') 
+                    : (isPortrait ? 'w-full h-0 opacity-0 invisible pointer-events-none' : 'w-0 h-full opacity-0 invisible pointer-events-none')
+                } shrink-0`}
               >
                 <div className="px-4 py-3 bg-black/40 border-b border-white/5 flex items-center justify-between shrink-0">
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -1566,7 +1569,7 @@ export default function RoomPage() {
                       type="button"
                       onClick={() => setShowFullscreenChat(false)} 
                       className="p-1 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded transition-all cursor-pointer"
-                      title="Hide Chat (Swipe left to close)"
+                      title={isPortrait ? "Hide Chat (Swipe down to close)" : "Hide Chat (Swipe left to close)"}
                     >
                       <Minimize className="w-3.5 h-3.5" />
                     </button>
@@ -1654,10 +1657,13 @@ export default function RoomPage() {
               </div>
             )}
 
-            {/* Right Column: Video player area (fills container normally, transitions to dynamic width when chat is open in fullscreen) */}
-            <div className={`relative flex items-center justify-center bg-black h-full transition-all duration-300 ${
+            {/* Right Column: Video player area (fills container normally, transitions to dynamic size when chat is open in fullscreen) */}
+            <div className={`relative flex items-center justify-center bg-black transition-all duration-300 ${
               isFullscreen 
-                ? (showFullscreenChat ? 'w-[calc(100%-320px)]' : 'w-full') 
+                ? (isPortrait 
+                    ? (showFullscreenChat ? 'w-full h-[55%]' : 'w-full h-full')
+                    : (showFullscreenChat ? 'w-[calc(100%-320px)] h-full' : 'w-full h-full')
+                  )
                 : 'w-full h-full'
             }`}>
               {uploading && (
@@ -1722,15 +1728,25 @@ export default function RoomPage() {
                 </div>
               )}
 
-              {/* Minimalist vertical handle line docked on the left screen edge when drawer is minimized */}
+              {/* Minimalist handle line docked when drawer is minimized */}
               {isFullscreen && !showFullscreenChat && (
-                <div
-                  onClick={() => setShowFullscreenChat(true)}
-                  className="absolute left-0 top-0 bottom-0 w-3 hover:w-5 bg-gradient-to-r from-purple-600/70 to-purple-600/10 hover:from-purple-500 hover:to-purple-600 border-r border-purple-500/20 flex items-center justify-center z-30 cursor-pointer transition-all duration-300 group"
-                  title="Swipe right or tap to open Cinema Chat"
-                >
-                  <div className="w-[3px] h-20 bg-purple-400/80 group-hover:bg-white rounded-full animate-pulse transition-colors" />
-                </div>
+                isPortrait ? (
+                  <div
+                    onClick={() => setShowFullscreenChat(true)}
+                    className="absolute bottom-0 left-0 right-0 h-3 hover:h-5 bg-gradient-to-t from-purple-600/70 to-purple-600/10 hover:from-purple-500 hover:to-purple-600 border-t border-purple-500/20 flex items-center justify-center z-30 cursor-pointer transition-all duration-300 group"
+                    title="Swipe up or tap to open Cinema Chat"
+                  >
+                    <div className="h-[3px] w-20 bg-purple-400/80 group-hover:bg-white rounded-full animate-pulse transition-colors" />
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => setShowFullscreenChat(true)}
+                    className="absolute left-0 top-0 bottom-0 w-3 hover:w-5 bg-gradient-to-r from-purple-600/70 to-purple-600/10 hover:from-purple-500 hover:to-purple-600 border-r border-purple-500/20 flex items-center justify-center z-30 cursor-pointer transition-all duration-300 group"
+                    title="Swipe right or tap to open Cinema Chat"
+                  >
+                    <div className="w-[3px] h-20 bg-purple-400/80 group-hover:bg-white rounded-full animate-pulse transition-colors" />
+                  </div>
+                )
               )}
             </div>
           </div>
