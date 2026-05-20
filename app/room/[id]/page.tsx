@@ -284,6 +284,12 @@ export default function RoomPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    const resetScroll = () => {
+      window.scrollTo(0, 0);
+      if (document.body) document.body.scrollTop = 0;
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+    };
+
     const handleResize = () => {
       if (window.visualViewport) {
         setViewportHeight(`${window.visualViewport.height}px`);
@@ -292,25 +298,35 @@ export default function RoomPage() {
         setViewportHeight('100dvh');
         setIsKeyboardOpen(false);
       }
-      // Force scroll reset
-      window.scrollTo(0, 0);
-      document.body.scrollTop = 0;
-      document.documentElement.scrollTop = 0;
+      
+      // Force scroll reset instantly and staggered to combat keyboard animation shifts
+      resetScroll();
+      const timeouts = [10, 50, 100, 150, 200, 300, 400, 600];
+      timeouts.forEach(delay => {
+        setTimeout(resetScroll, delay);
+      });
     };
 
     const handleFocusIn = (e: FocusEvent) => {
       if ((e.target as HTMLElement).tagName === 'INPUT') {
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-          document.body.scrollTop = 0;
-          document.documentElement.scrollTop = 0;
-        }, 50);
+        resetScroll();
+        const timeouts = [10, 50, 100, 150, 200, 300, 400, 600];
+        timeouts.forEach(delay => {
+          setTimeout(resetScroll, delay);
+        });
+      }
+    };
+
+    const handleWindowScroll = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        resetScroll();
       }
     };
 
     window.visualViewport?.addEventListener('resize', handleResize);
     window.visualViewport?.addEventListener('scroll', handleResize);
     window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
     document.addEventListener('focusin', handleFocusIn);
     
     handleResize();
@@ -319,6 +335,7 @@ export default function RoomPage() {
       window.visualViewport?.removeEventListener('resize', handleResize);
       window.visualViewport?.removeEventListener('scroll', handleResize);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleWindowScroll);
       document.removeEventListener('focusin', handleFocusIn);
     };
   }, []);
