@@ -114,6 +114,42 @@ export default function RoomPage() {
   const [showFullscreenChat, setShowFullscreenChat] = useState(true);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
+  // Dynamic Simulated Mobile Fullscreen style selection
+  const getFullscreenStyle = (): React.CSSProperties | undefined => {
+    if (!isFullscreen || typeof window === 'undefined') return undefined;
+    
+    const isMobile = window.innerWidth < 1024;
+    if (!isMobile) return undefined; // Desktop uses native fullscreen
+    
+    const isPortrait = window.innerWidth < window.innerHeight;
+    if (isPortrait) {
+      const vv = window.visualViewport;
+      if (vv) {
+        return {
+          position: 'fixed',
+          top: `${vv.offsetTop}px`,
+          left: `${vv.offsetLeft + vv.width}px`,
+          width: `${vv.height}px`,
+          height: `${vv.width}px`,
+          transform: 'rotate(90deg)',
+          transformOrigin: 'top left',
+        };
+      }
+      return {
+        position: 'fixed',
+        top: 0,
+        left: '100vw',
+        width: '100vh',
+        height: '100vw',
+        transform: 'rotate(90deg)',
+        transformOrigin: 'top left',
+      };
+    } else {
+      // Landscape: standard fit
+      return viewportStyle;
+    }
+  };
+
   // References
   const wsRef = useRef<WebSocket | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -1507,7 +1543,7 @@ export default function RoomPage() {
               ? "fixed z-[100] flex flex-row bg-black overflow-hidden shadow-2xl animate-fade-in items-stretch justify-between rounded-none border-0"
               : "flex-1 flex items-center justify-center bg-black rounded-2xl border border-white/5 relative overflow-hidden aspect-video w-full lg:max-h-[85%] mx-auto shadow-2xl animate-fade-in shrink-0 lg:shrink"
             }
-            style={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 1024 ? viewportStyle : undefined}
+            style={getFullscreenStyle()}
           >
             {/* Left Column: Fullscreen Chat drawer */}
             {isFullscreen && (
