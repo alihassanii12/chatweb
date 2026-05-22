@@ -30,7 +30,7 @@ export function ChatMessage({
       )}
       <div
         className={`max-w-[88%] rounded-lg leading-snug ${
-          compact ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'
+          compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'
         } ${
           isSelf
             ? 'bg-purple-600/90 text-white'

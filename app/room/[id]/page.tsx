@@ -1707,12 +1707,24 @@ export default function RoomPage() {
         )}
 
         {/* Left Column (Desktop Left): Tabbed Sidebar Panel (Responsive inline-stacked bottom on mobile (order 2), side-aligned on desktop (order 1)) */}
-        <aside className={`w-full order-2 lg:order-1 cinema-sidebar flex flex-col flex-1 min-h-0 overflow-hidden ${isMobile ? 'mobile-panel-pad' : ''} ${
+        <aside className={`w-full order-2 lg:order-1 cinema-sidebar flex flex-col flex-1 min-h-0 overflow-hidden ${
           layoutMode === 'both' 
             ? 'lg:w-96 border-t lg:border-t-0 lg:border-r lg:flex-none lg:h-full' 
             : 'w-full lg:w-full border-t-0 border-r-0 lg:h-full'
         }`}>
-          {/* Desktop tab bar only */}
+          {isMobile && (
+            <MobileTabBar
+              activeTab={activeTab}
+              onTabChange={(tab) => {
+                setActiveTab(tab);
+                if (layoutMode === 'chat_only' && (tab === 'library' || tab === 'call')) {
+                  setLayoutMode('both');
+                }
+              }}
+              showTypingDot={partnerIsTyping}
+            />
+          )}
+
           {layoutMode === 'both' && (
             <div className="hidden lg:flex border-b border-white/5 bg-black/30 shrink-0">
               <button
@@ -2053,20 +2065,6 @@ export default function RoomPage() {
           )}
         </aside>
       </div>
-
-      {isMobile && (
-        <MobileTabBar
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            if (layoutMode === 'chat_only' && tab === 'chat') return;
-            if (layoutMode === 'chat_only' && (tab === 'library' || tab === 'call')) {
-              setLayoutMode('both');
-            }
-          }}
-          showTypingDot={partnerIsTyping}
-        />
-      )}
     </div>
   );
 }

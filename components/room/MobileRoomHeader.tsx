@@ -35,25 +35,25 @@ export function MobileRoomHeader({
           <button
             type="button"
             onClick={() => onLayoutChange('both')}
-            className={`px-2 py-1 rounded-md text-[10px] font-medium flex items-center gap-1 ${
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 ${
               layoutMode === 'both'
                 ? 'bg-purple-600 text-white'
                 : 'text-gray-500 bg-white/5'
             }`}
           >
-            <Video className="w-3 h-3" />
+            <Video className="w-4 h-4" />
             Both
           </button>
           <button
             type="button"
             onClick={() => onLayoutChange('chat_only')}
-            className={`px-2 py-1 rounded-md text-[10px] font-medium flex items-center gap-1 ${
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 ${
               layoutMode === 'chat_only'
                 ? 'bg-purple-600 text-white'
                 : 'text-gray-500 bg-white/5'
             }`}
           >
-            <MessageSquare className="w-3 h-3" />
+            <MessageSquare className="w-4 h-4" />
             Chat
           </button>
         </div>
