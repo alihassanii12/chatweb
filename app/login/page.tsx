@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Tv, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { apiJson } from '@/lib/api';
+import { getAccessToken, saveSession } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,8 +15,7 @@ export default function LoginPage() {
 
   // If already logged in, redirect to home page
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
+    if (getAccessToken()) {
       router.push('/');
     }
   }, [router]);
@@ -24,30 +25,22 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     try {
-      const response = await fetch(`${apiUrl}/api/accounts/login/`, {
+      const data = await apiJson<{
+        access: string;
+        refresh: string;
+        user: Record<string, unknown>;
+      }>('/api/accounts/login/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        public: true,
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Invalid email or password');
-      }
-
-      // Store tokens and user profile details
-      localStorage.setItem('access_token', data.access);
-      localStorage.setItem('refresh_token', data.refresh);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
+      saveSession(data.access, data.refresh, data.user);
       router.push('/');
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }

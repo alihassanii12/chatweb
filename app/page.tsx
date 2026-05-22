@@ -3,13 +3,14 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { getAccessToken, getStoredUser } from '@/lib/auth';
 
 export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    const userData = localStorage.getItem('user');
+    const token = getAccessToken();
+    const userData = getStoredUser();
 
     if (!token || !userData) {
       router.push('/login');

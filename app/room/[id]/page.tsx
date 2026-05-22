@@ -6,6 +6,9 @@ import {
   Tv, Send, Copy, Check, MessageSquare, Video, VideoOff, 
   Mic, MicOff, Play, Pause, RefreshCw, Users, AlertCircle, ArrowLeft, Loader2, UploadCloud, Paperclip, Maximize, Minimize, Film, Trash2, Smile 
 } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { getAccessToken, getApiBase, getStoredUser, getWsBase } from '@/lib/auth';
+import { getCleanEmbedUrl, getYouTubeId, isEmbedUrl } from '@/lib/video';
 
 interface ChatMsg {
   id: number;
@@ -74,9 +77,8 @@ export default function RoomPage() {
   const [chatInput, setChatInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
-  // Dynamic network host parameters
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const wsBase = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+  const apiBase = getApiBase();
+  const wsBase = getWsBase();
   
   // Persistent Room Media Library state
   const [sharedMedia, setSharedMedia] = useState<RoomMediaItem[]>([]);
@@ -152,68 +154,6 @@ export default function RoomPage() {
   const amITypingRef = useRef<boolean>(false);
   const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // YouTube Link Checker with Shorts support
-  const getYouTubeId = (url: string) => {
-    if (!url) return null;
-    const trimmed = url.trim();
-    
-    // Direct 11-char ID matching
-    if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
-      return trimmed;
-    }
-
-    try {
-      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
-      const match = trimmed.match(regExp);
-      if (match && match[2].length === 11) {
-        return match[2];
-      }
-    } catch (e) {
-      // Fallback
-    }
-    return null;
-  };
-
-  // Embed URL Checker (MovieBox, vidsrc, custom iframes)
-  const isEmbedUrl = (url: string) => {
-    if (!url) return false;
-    const trimmed = url.trim().toLowerCase();
-    
-    if (getYouTubeId(url)) return false;
-    
-    const isDirectVideo = trimmed.includes('.mp4') || 
-                          trimmed.includes('.webm') || 
-                          trimmed.includes('.ogg') || 
-                          trimmed.includes('.m3u8') || 
-                          trimmed.startsWith('data:video');
-                          
-    return trimmed.startsWith('http') && !isDirectVideo;
-  };
-
-  // Convert watch URLs to ad-blocked player-only embed URLs (YouTube, MovieBox) with SSL Upgrades
-  const getCleanEmbedUrl = (url: string) => {
-    if (!url) return '';
-    let trimmed = url.trim();
-    
-    // Auto-upgrade protocol to HTTPS to prevent Mixed Content security blocks
-    if (trimmed.startsWith('http://')) {
-      trimmed = trimmed.replace('http://', 'https://');
-    }
-    
-    // YouTube handler
-    const ytId = getYouTubeId(trimmed);
-    if (ytId) {
-      return `https://www.youtube.com/embed/${ytId}?autoplay=1&enablejsapi=1`;
-    }
-    
-    // MovieBox Watch page to Embed page converter
-    if (trimmed.includes('moviebox') && trimmed.includes('/watch/')) {
-      return trimmed.replace('/watch/', '/embed/');
-    }
-    
-    return trimmed;
-  };
-
   // YouTube ID resolver
   const ytVideoId = getYouTubeId(currentVideoUrl);
 
@@ -281,12 +221,12 @@ export default function RoomPage() {
 
   // Authenticate & Load profile
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    const userData = localStorage.getItem('user');
+    const token = getAccessToken();
+    const userData = getStoredUser();
     if (!token || !userData) {
       router.push('/login');
     } else {
-      setUser(JSON.parse(userData));
+      setUser(userData);
     }
   }, [router]);
 
@@ -424,12 +364,9 @@ export default function RoomPage() {
 
   // Fetch Room Media History List API
   const fetchRoomMediaHistory = async () => {
-    const token = localStorage.getItem('access_token');
-    if (!token) return;
+    if (!getAccessToken()) return;
     try {
-      const res = await fetch(`${apiBase}/api/rooms/${roomId}/media/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await apiFetch(`/api/rooms/${roomId}/media/`);
       if (res.ok) {
         const data = await res.json();
         setSharedMedia(data);
@@ -442,13 +379,10 @@ export default function RoomPage() {
   // Load Room REST API Detail & Chat History
   useEffect(() => {
     if (!user) return;
-    const token = localStorage.getItem('access_token');
 
     const fetchRoomDetail = async () => {
       try {
-        const res = await fetch(`${apiBase}/api/rooms/${roomId}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await apiFetch(`/api/rooms/${roomId}/`);
         if (!res.ok) throw new Error();
         const data = await res.json();
         setRoom(data);
@@ -469,9 +403,7 @@ export default function RoomPage() {
 
     const fetchChatHistory = async () => {
       try {
-        const res = await fetch(`${apiBase}/api/rooms/${roomId}/chat/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await apiFetch(`/api/rooms/${roomId}/chat/`);
         if (res.ok) {
           const data = await res.json();
           setMessages(data);
@@ -518,7 +450,8 @@ export default function RoomPage() {
   // WebSocket Connection Lifecycle
   useEffect(() => {
     if (!user || !wsBase) return;
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
+    if (!token) return;
     const wsUrl = `${wsBase}/ws/room/${roomId}/?token=${token}`;
 
     const ws = new WebSocket(wsUrl);
@@ -899,7 +832,8 @@ export default function RoomPage() {
 
     setUploading(true);
     setUploadProgress(0);
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
+    if (!token) return;
     const formData = new FormData();
     formData.append('file', file);
 
@@ -1997,11 +1931,9 @@ export default function RoomPage() {
                               e.stopPropagation();
                               if (!confirm(`Do you want to delete "${media.title}" from the cinema playlist?`)) return;
                               
-                              const token = localStorage.getItem('access_token');
                               try {
-                                const res = await fetch(`${apiBase}/api/rooms/${roomId}/media/${media.id}/`, {
+                                const res = await apiFetch(`/api/rooms/${roomId}/media/${media.id}/`, {
                                   method: 'DELETE',
-                                  headers: { 'Authorization': `Bearer ${token}` }
                                 });
                                 
                                 if (res.ok) {
