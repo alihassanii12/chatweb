@@ -9,6 +9,13 @@ import {
 import { apiFetch } from '@/lib/api';
 import { getAccessToken, getApiBase, getStoredUser, getWsBase } from '@/lib/auth';
 import { getCleanEmbedUrl, getYouTubeId, isEmbedUrl } from '@/lib/video';
+import { ChatMessage } from '@/components/ui/ChatMessage';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { StatusPill } from '@/components/ui/StatusPill';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { MobileRoomHeader } from '@/components/room/MobileRoomHeader';
+import { MobileTabBar } from '@/components/room/MobileTabBar';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ChatMsg {
   id: number;
@@ -79,6 +86,7 @@ export default function RoomPage() {
   
   const apiBase = getApiBase();
   const wsBase = getWsBase();
+  const isMobile = useIsMobile();
   
   // Persistent Room Media Library state
   const [sharedMedia, setSharedMedia] = useState<RoomMediaItem[]>([]);
@@ -1319,10 +1327,10 @@ export default function RoomPage() {
 
   if (!user || !room) {
     return (
-      <div className="flex-1 flex flex-col justify-center items-center bg-[#0a0a0c]">
-        <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4" />
-        <span className="text-gray-400 text-sm">Opening Cinema Theater...</span>
-      </div>
+      <LoadingScreen
+        title="Private Cinema"
+        subtitle="Connecting to your theater..."
+      />
     );
   }
 
@@ -1355,57 +1363,77 @@ export default function RoomPage() {
         className="hidden"
       />
 
-      {/* Upper header */}
-      <header className="px-6 py-3.5 bg-black/40 border-b border-white/5 flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="p-2 bg-purple-600/10 border border-purple-500/20 rounded-xl relative">
-            <Tv className="w-5 h-5 text-purple-400" />
-            {connected ? (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-            ) : (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 inline-block"></span>
-            )}
+      <MobileRoomHeader
+        connected={connected}
+        username={user.username}
+        partnerUsername={partnerUsername}
+        layoutMode={layoutMode}
+        onLayoutChange={(mode) => {
+          setLayoutMode(mode);
+          if (mode === 'chat_only') setActiveTab('chat');
+        }}
+      />
+
+      {/* Desktop header */}
+      <header className="hidden lg:flex px-6 py-3 cinema-glass border-b border-white/5 items-center justify-between gap-4 z-10 shrink-0">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="p-2 bg-purple-600/15 border border-purple-500/25 rounded-xl shrink-0">
+            <Tv className="w-5 h-5 text-purple-300" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-white truncate">Private Cinema</p>
+            <p className="text-[10px] text-gray-500 truncate">
+              {partnerUsername
+                ? `Watching with ${partnerUsername}`
+                : 'Waiting for your partner...'}
+            </p>
+          </div>
+          <StatusPill connected={connected} />
+          <div className="flex items-center gap-2 pl-4 border-l border-white/8">
+            <UserAvatar name={user.username} size="sm" />
+            <span className="text-xs font-semibold text-gray-300 max-w-[120px] truncate">
+              {user.username}
+            </span>
           </div>
         </div>
 
-        {/* Dynamic Layout Mode Selector */}
-        <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 select-none gap-1 shrink-0">
+        <div className="flex bg-black/30 p-1 rounded-xl border border-white/8 select-none gap-1 shrink-0">
           <button
+            type="button"
             onClick={() => setLayoutMode('both')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               layoutMode === 'both'
                 ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <Video className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Video + Chat</span>
-            <span className="sm:hidden">Both</span>
+            Video + Chat
           </button>
           <button
+            type="button"
             onClick={() => {
               setLayoutMode('chat_only');
               setActiveTab('chat');
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               layoutMode === 'chat_only'
                 ? 'bg-purple-600 text-white shadow-md shadow-purple-600/25'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Chat Only</span>
-            <span className="sm:hidden">Chat</span>
+            Chat Only
           </button>
         </div>
       </header>
 
-      {/* Main Split workspace - Ultra Responsive stacked on mobile, side-by-side on desktop */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+      {/* Main workspace */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
         {/* Left Column (Desktop Right): Synced Video Player. Stacked top on mobile (order 1), fills right side on desktop (order 2) */}
         {layoutMode === 'both' && (
-          <div className={`w-full lg:flex-1 order-1 lg:order-2 flex flex-col lg:justify-between overflow-hidden relative ${
-            isKeyboardOpen ? 'hidden' : 'p-3 sm:p-5 shrink-0 lg:shrink'
+          <div className={`w-full lg:flex-1 order-1 lg:order-2 flex flex-col overflow-hidden relative min-h-0 shrink-0 ${
+            isKeyboardOpen || (isMobile && activeTab !== 'chat') ? 'hidden' : 'p-2 sm:p-5'
           }`}>
           {/* Ambient Cinema Hue Backlight Glow */}
           <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] aspect-video bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 rounded-[50px] filter blur-[100px] transition-all duration-1000 -z-10 ${
@@ -1413,61 +1441,68 @@ export default function RoomPage() {
           }`} />
 
           {/* Compact Toggle for Media Controls on Mobile */}
-          <div className="flex lg:hidden items-center justify-between mb-2 shrink-0">
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-              {room?.is_playing ? 'Playing synced video' : 'Screen Idle'}
+          <div className="flex lg:hidden items-center justify-between mb-2 shrink-0 gap-2">
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider truncate">
+              {room?.is_playing ? '▶ Playing' : 'Screen idle'}
             </span>
             <button
+              type="button"
               onClick={() => setShowControlsMobile(!showControlsMobile)}
-              className="px-3 py-1.5 bg-purple-600/10 border border-purple-500/30 text-purple-400 hover:text-purple-300 text-[10px] font-bold rounded-lg transition-all active:scale-95 flex items-center gap-1"
+              className="min-h-[44px] px-3 py-2 bg-purple-600/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold rounded-xl touch-manipulation flex items-center gap-1.5 shrink-0"
             >
-              <Film className="w-3 h-3" />
-              <span>{showControlsMobile ? 'Hide Controls' : 'Change Video / Upload'}</span>
+              <Film className="w-4 h-4" />
+              {showControlsMobile ? 'Hide' : 'Video'}
             </button>
           </div>
 
-          {/* Load Video form input & File Uploader */}
-          <div className={`${showControlsMobile ? 'flex' : 'hidden lg:flex'} mb-3 shrink-0 flex flex-col sm:flex-row gap-2.5`}>
-            <form onSubmit={handleLoadNewVideo} className="flex-1 flex gap-2">
+          {/* Load Video form — mobile: stacked grid; desktop: row */}
+          <div
+            className={`${
+              showControlsMobile ? 'grid' : 'hidden lg:grid'
+            } lg:flex mb-2 lg:mb-3 shrink-0 grid-cols-2 gap-2 lg:flex-row lg:gap-2.5`}
+          >
+            <form onSubmit={handleLoadNewVideo} className="col-span-2 lg:flex-1 flex gap-2">
               <input
                 type="text"
                 value={videoUrlInput}
                 onChange={(e) => setVideoUrlInput(e.target.value)}
-                placeholder="Paste direct MP4 video link or YouTube video URL"
-                className="flex-1 px-4 py-2.5 bg-black/30 border border-white/10 rounded-xl text-white text-base sm:text-xs placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
+                placeholder="YouTube or MP4 link"
+                className="cinema-input flex-1 min-h-[44px] text-base lg:text-sm"
               />
               <button
                 type="submit"
-                className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
+                className="cinema-btn cinema-btn-primary shrink-0 min-h-[44px] min-w-[44px] touch-manipulation"
+                aria-label="Load video"
               >
                 <RefreshCw className="w-4 h-4" />
-                <span className="hidden sm:inline">Load URL</span>
+                <span className="hidden sm:inline">Load</span>
               </button>
             </form>
 
-            <div className="flex gap-2 shrink-0">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/30 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-              >
-                {uploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <UploadCloud className="w-4 h-4" />
-                )}
-                <span>{uploading ? `Uploading ${uploadProgress}%` : 'Upload'}</span>
-              </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="cinema-btn cinema-btn-success col-span-1 min-h-[44px] touch-manipulation"
+            >
+              {uploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <UploadCloud className="w-4 h-4" />
+              )}
+              <span className="truncate">{uploading ? `${uploadProgress}%` : 'Upload'}</span>
+            </button>
 
-              <button
-                onClick={toggleFullscreen}
-                className="px-4 py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                title="Cinema Fullscreen"
-              >
-                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                <span className="hidden sm:inline">Cinema Mode</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="cinema-btn cinema-btn-secondary col-span-1 min-h-[44px] touch-manipulation"
+              title="Cinema Fullscreen"
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              <span className="lg:hidden">Full</span>
+              <span className="hidden lg:inline">Cinema Mode</span>
+            </button>
           </div>
 
           {/* Core Player display box. On mobile has aspect-video ratio, on desktop scales relative to space.
@@ -1478,7 +1513,7 @@ export default function RoomPage() {
             onTouchEnd={handlePlayerTouchEnd}
             className={isFullscreen 
               ? `fixed z-[100] flex ${isPortrait ? 'flex-col' : 'flex-row'} bg-black overflow-hidden shadow-2xl animate-fade-in items-stretch justify-between rounded-none border-0`
-              : "flex-1 flex items-center justify-center bg-black rounded-2xl border border-white/5 relative overflow-hidden aspect-video w-full lg:max-h-[85%] mx-auto shadow-2xl animate-fade-in shrink-0 lg:shrink"
+              : "mobile-player-height lg:flex-1 flex items-center justify-center bg-black rounded-xl lg:rounded-2xl border border-white/5 relative overflow-hidden w-full lg:max-h-[85%] lg:aspect-video mx-auto shadow-2xl animate-fade-in shrink-0"
             }
             style={getFullscreenStyle()}
           >
@@ -1651,13 +1686,15 @@ export default function RoomPage() {
                 )
               ) : (
                 /* Landing display when player is empty */
-                <div className="flex flex-col items-center p-6 text-center max-w-lg mx-auto animate-fade-in">
-                  <div className="p-4 bg-purple-600/10 border border-purple-500/25 rounded-2xl mb-4 animate-pulse shrink-0">
-                    <Tv className="w-10 h-10 text-purple-400" />
+                <div className="flex flex-col items-center p-8 text-center max-w-lg mx-auto animate-fade-in">
+                  <div className="p-5 bg-gradient-to-br from-purple-600/20 to-pink-600/10 border border-purple-500/30 rounded-3xl mb-5 shrink-0">
+                    <Tv className="w-12 h-12 text-purple-300" />
                   </div>
-                  <h3 className="text-sm font-extrabold text-white mb-2 tracking-wide shrink-0">Lounge Screen Idle</h3>
-                  <p className="text-gray-400 text-xs max-w-xs leading-relaxed shrink-0">
-                    Paste a video link or upload a file above to start watching in perfect real-time sync with your partner.
+                  <h3 className="text-base font-bold text-white mb-2 tracking-wide shrink-0">
+                    Screen is ready
+                  </h3>
+                  <p className="text-gray-500 text-xs max-w-[260px] leading-relaxed shrink-0">
+                    Paste a YouTube or MP4 link, or upload a file to start watching in sync with your partner.
                   </p>
                 </div>
               )}
@@ -1688,21 +1725,17 @@ export default function RoomPage() {
         )}
 
         {/* Left Column (Desktop Left): Tabbed Sidebar Panel (Responsive inline-stacked bottom on mobile (order 2), side-aligned on desktop (order 1)) */}
-        <aside className={`w-full order-2 lg:order-1 border-white/5 bg-[#121217] flex flex-col flex-1 min-h-0 overflow-hidden ${
+        <aside className={`w-full order-2 lg:order-1 cinema-sidebar flex flex-col flex-1 min-h-0 overflow-hidden ${isMobile ? 'mobile-panel-pad' : ''} ${
           layoutMode === 'both' 
             ? 'lg:w-96 border-t lg:border-t-0 lg:border-r lg:flex-none lg:h-full' 
             : 'w-full lg:w-full border-t-0 border-r-0 lg:h-full'
         }`}>
-          {/* Tab Selector */}
+          {/* Desktop tab bar only */}
           {layoutMode === 'both' && (
-            <div className="flex border-b border-white/5 bg-black/20 shrink-0">
+            <div className="hidden lg:flex border-b border-white/5 bg-black/30 shrink-0">
               <button
                 onClick={() => setActiveTab('chat')}
-                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer relative ${
-                  activeTab === 'chat' 
-                    ? 'border-purple-500 text-white bg-white/5' 
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                }`}
+                className={`cinema-tab relative ${activeTab === 'chat' ? 'cinema-tab-active' : ''}`}
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Chat</span>
@@ -1715,22 +1748,14 @@ export default function RoomPage() {
               </button>
               <button
                 onClick={() => setActiveTab('library')}
-                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'library' 
-                    ? 'border-purple-500 text-white bg-white/5' 
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                }`}
+                className={`cinema-tab ${activeTab === 'library' ? 'cinema-tab-active' : ''}`}
               >
                 <Film className="w-3.5 h-3.5" />
                 <span>Library</span>
               </button>
               <button
                 onClick={() => setActiveTab('call')}
-                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'call' 
-                    ? 'border-purple-500 text-white bg-white/5' 
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                }`}
+                className={`cinema-tab ${activeTab === 'call' ? 'cinema-tab-active' : ''}`}
               >
                 <Video className="w-3.5 h-3.5" />
                 <span>Call</span>
@@ -1750,35 +1775,16 @@ export default function RoomPage() {
                     <p className="text-gray-600 text-[10px]">Your messages are securely recorded in the database.</p>
                   </div>
                 ) : (
-                  messages.map((msg, index) => {
-                    const isSelf = msg.sender_name === user.username;
-                    const isSystem = msg.sender_name === 'System';
-
-                    if (isSystem) {
-                      return (
-                        <div key={index} className="flex justify-center">
-                          <span className="px-3 py-1 bg-white/5 border border-white/5 text-gray-500 text-[10px] rounded-full animate-fade-in">
-                            {msg.content}
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div key={index} className={`flex flex-col animate-fade-in ${isSelf ? 'items-end' : 'items-start'}`}>
-                        <div className="flex items-center gap-1.5 mb-1 px-1">
-                          <span className="text-[10px] text-gray-500 font-semibold">{msg.sender_name}</span>
-                        </div>
-                        <div className={`px-4 py-2.5 max-w-[85%] rounded-2xl text-xs leading-relaxed ${
-                          isSelf 
-                            ? 'bg-purple-600 text-white rounded-tr-none' 
-                            : 'bg-white/5 text-gray-200 border border-white/5 rounded-tl-none'
-                        }`}>
-                          {msg.content}
-                        </div>
-                      </div>
-                    );
-                  })
+                  messages.map((msg, index) => (
+                    <ChatMessage
+                      key={`${msg.id}-${index}`}
+                      content={msg.content}
+                      senderName={msg.sender_name}
+                      isSelf={msg.sender_name === user.username}
+                      isSystem={msg.sender_name === 'System'}
+                      compact={isMobile}
+                    />
+                  ))
                 )}
                 {partnerIsTyping && (
                   <div className="flex flex-col animate-fade-in items-start py-1 shrink-0">
@@ -1797,10 +1803,10 @@ export default function RoomPage() {
               </div>
 
               {/* Chat Input form */}
-              <form onSubmit={handleSendChat} className="p-3 border-t border-white/5 bg-black/20 shrink-0 flex gap-2 relative">
+              <form onSubmit={handleSendChat} className="p-3 border-t border-white/5 bg-black/20 shrink-0 flex gap-2 relative safe-bottom lg:pb-3">
                 {/* Emoji Picker Drawer */}
                 {showEmojiPicker && (
-                  <div className="emoji-picker-container absolute bottom-16 left-3 right-3 bg-[#16161f]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-30 p-3 h-64 flex flex-col overflow-hidden animate-fade-in">
+                  <div className="emoji-picker-container absolute bottom-[calc(100%+8px)] left-2 right-2 sm:left-3 sm:right-3 bg-[#16161f]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-30 p-3 max-h-[min(42dvh,280px)] flex flex-col overflow-hidden animate-fade-in">
                     <div className="flex justify-between items-center pb-2 border-b border-white/5 mb-2 shrink-0">
                       <span className="text-[10px] font-extrabold tracking-wider text-purple-400 uppercase">Express Yourself</span>
                       <button
@@ -1815,7 +1821,7 @@ export default function RoomPage() {
                       {EMOJI_CATEGORIES.map((category, catIndex) => (
                         <div key={catIndex} className="space-y-1">
                           <h4 className="text-[9px] font-bold text-gray-500 px-1">{category.name}</h4>
-                          <div className="grid grid-cols-8 gap-1.5">
+                          <div className="grid grid-cols-7 sm:grid-cols-8 gap-1.5">
                             {category.emojis.map((emoji, emojiIndex) => (
                               <button
                                 key={emojiIndex}
@@ -1826,7 +1832,7 @@ export default function RoomPage() {
                                   setChatInput(prev => prev + emoji);
                                   handleChatInputChange(chatInput + emoji);
                                 }}
-                                className="w-8 h-8 flex items-center justify-center text-lg hover:bg-white/10 rounded-lg active:scale-90 transition-all cursor-pointer"
+                                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-xl sm:text-lg hover:bg-white/10 rounded-xl active:scale-90 transition-all touch-manipulation"
                               >
                                 {emoji}
                               </button>
@@ -1841,37 +1847,39 @@ export default function RoomPage() {
                 <input
                   ref={chatInputRef}
                   type="text"
+                  enterKeyHint="send"
                   value={chatInput}
                   onChange={(e) => handleChatInputChange(e.target.value)}
-                  placeholder="Type message..."
-                  className="flex-1 px-3.5 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-base sm:text-xs placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="Type a message..."
+                  className="cinema-input flex-1 min-h-[44px] !py-3 text-base lg:text-sm"
                 />
 
-                {/* Emoji toggle button */}
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onTouchStart={(e) => e.preventDefault()}
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className={`p-2.5 rounded-xl border border-white/5 transition-all cursor-pointer shrink-0 active:scale-95 flex items-center justify-center ${
+                  className={`touch-target rounded-xl border border-white/5 shrink-0 flex items-center justify-center touch-manipulation ${
                     showEmojiPicker 
                       ? 'bg-purple-600/20 border-purple-500/30 text-purple-400' 
-                      : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                      : 'bg-white/5 text-gray-400'
                   }`}
                   title="Insert Emoji"
+                  aria-label="Emoji picker"
                 >
-                  <Smile className="w-4 h-4" />
+                  <Smile className="w-5 h-5" />
                 </button>
 
-                <button
-                  type="submit"
-                  disabled={!chatInput.trim()}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onTouchStart={(e) => e.preventDefault()}
-                  className="p-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/30 text-white rounded-xl transition-all cursor-pointer shrink-0 active:scale-95"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+              <button
+                type="submit"
+                disabled={!chatInput.trim()}
+                onMouseDown={(e) => e.preventDefault()}
+                onTouchStart={(e) => e.preventDefault()}
+                className="cinema-btn cinema-btn-primary touch-target !px-4 shrink-0 touch-manipulation"
+                aria-label="Send message"
+              >
+                <Send className="w-5 h-5" />
+              </button>
               </form>
             </div>
           )}
@@ -1951,10 +1959,11 @@ export default function RoomPage() {
                                 console.error('Error deleting media', err);
                               }
                             }}
-                            className="p-1.5 bg-red-500/10 hover:bg-red-500/25 border border-transparent hover:border-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center justify-center shrink-0 active:scale-95 cursor-pointer"
+                            className="touch-target p-2 bg-red-500/15 border border-red-500/25 text-red-400 rounded-xl transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 flex items-center justify-center shrink-0 touch-manipulation"
                             title="Delete Video"
+                            aria-label="Delete video"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                         <div className="flex items-center justify-between text-[9px] text-gray-500 mt-1">
@@ -1975,22 +1984,17 @@ export default function RoomPage() {
               {/* Feeds Viewbox */}
               <div className="flex-1 flex flex-col gap-4 items-stretch mb-4 justify-center">
                 {inCall ? (
-                  <div className="grid grid-cols-1 gap-4 w-full">
-                    {/* Remote Stream Video */}
-                    <div className="bg-black border border-white/5 rounded-2xl overflow-hidden aspect-video relative shadow-2xl">
-                      <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-black/60 rounded-lg border border-white/10 text-[10px] text-gray-300 font-semibold uppercase tracking-wider backdrop-blur-md">
-                        {partnerUsername ? partnerUsername : 'Remote Feed'}
-                      </div>
+                  <div className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-black shadow-2xl mobile-player-height lg:aspect-video lg:h-auto max-lg:min-h-[220px]">
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-black/70 rounded-lg border border-white/10 text-[10px] text-gray-200 font-semibold backdrop-blur-md max-w-[60%] truncate">
+                      {partnerUsername ?? 'Partner'}
                     </div>
-
-                    {/* Local Feed Pip */}
-                    <div className="bg-black border border-white/5 rounded-2xl overflow-hidden aspect-video relative max-w-[150px] self-end shadow-xl">
+                    <div className="absolute bottom-3 right-3 w-[30%] min-w-[96px] max-w-[120px] aspect-[3/4] rounded-xl overflow-hidden border-2 border-purple-500/40 shadow-xl bg-black">
                       <video
                         ref={localVideoRef}
                         autoPlay
@@ -1998,7 +2002,7 @@ export default function RoomPage() {
                         muted
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-purple-600/80 rounded-md text-[8px] text-white font-bold uppercase backdrop-blur-sm">
+                      <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-purple-600/90 rounded text-[8px] text-white font-bold">
                         You
                       </div>
                     </div>
@@ -2023,10 +2027,11 @@ export default function RoomPage() {
               {/* Controls panel */}
               <div className="shrink-0 space-y-3">
                 {inCall ? (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button
+                      type="button"
                       onClick={toggleMic}
-                      className={`flex-1 py-3 border rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
+                      className={`flex-1 min-h-[48px] py-3 border rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 touch-manipulation ${
                         micMuted 
                           ? 'bg-red-500/10 border-red-500/30 text-red-400' 
                           : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'
@@ -2037,8 +2042,9 @@ export default function RoomPage() {
                     </button>
                     
                     <button
+                      type="button"
                       onClick={toggleVideo}
-                      className={`flex-1 py-3 border rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
+                      className={`flex-1 min-h-[48px] py-3 border rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 touch-manipulation ${
                         videoMuted 
                           ? 'bg-red-500/10 border-red-500/30 text-red-400' 
                           : 'bg-white/5 border-white/5 hover:bg-white/10 text-white'
@@ -2049,17 +2055,19 @@ export default function RoomPage() {
                     </button>
 
                     <button
+                      type="button"
                       onClick={endCall}
-                      className="px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs active:scale-95 cursor-pointer"
+                      className="w-full sm:w-auto min-h-[48px] px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs touch-manipulation"
                     >
-                      End
+                      End call
                     </button>
                   </div>
                 ) : (
                   <button
+                    type="button"
                     onClick={startCall}
                     disabled={!partnerUsername}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/30 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+                    className="w-full min-h-[48px] flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/30 text-white text-sm font-bold rounded-xl shadow-md touch-manipulation"
                   >
                     <Video className="w-4 h-4" />
                     <span>Start Video Call</span>
@@ -2070,6 +2078,20 @@ export default function RoomPage() {
           )}
         </aside>
       </div>
+
+      {isMobile && (
+        <MobileTabBar
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab);
+            if (layoutMode === 'chat_only' && tab === 'chat') return;
+            if (layoutMode === 'chat_only' && (tab === 'library' || tab === 'call')) {
+              setLayoutMode('both');
+            }
+          }}
+          showTypingDot={partnerIsTyping}
+        />
+      )}
     </div>
   );
 }

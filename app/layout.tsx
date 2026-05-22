@@ -22,6 +22,7 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };
 
@@ -36,7 +37,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col font-sans text-[var(--foreground)] bg-[var(--background)]">
+        {children}
+      </body>
     </html>
   );
 }

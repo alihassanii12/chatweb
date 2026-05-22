@@ -2,9 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Tv, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Tv, Mail, Lock, AlertCircle, Loader2, Sparkles, Users, Video } from 'lucide-react';
 import { apiJson } from '@/lib/api';
 import { getAccessToken, saveSession } from '@/lib/auth';
+
+const FEATURES = [
+  { icon: Video, label: 'Synced playback' },
+  { icon: Users, label: 'Private chat' },
+  { icon: Sparkles, label: 'Video calls' },
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,7 +19,6 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // If already logged in, redirect to home page
   useEffect(() => {
     if (getAccessToken()) {
       router.push('/');
@@ -39,7 +44,8 @@ export default function LoginPage() {
       saveSession(data.access, data.refresh, data.user);
       router.push('/');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setError(message);
     } finally {
       setLoading(false);
@@ -47,66 +53,77 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-center items-center px-4 bg-[#0a0a0c] relative overflow-hidden">
-      {/* Background visual neon decorations */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none"></div>
+    <div className="cinema-mesh flex-1 flex flex-col justify-center items-center px-4 py-8 safe-bottom safe-top relative overflow-hidden min-h-[100dvh]">
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/40 to-transparent" />
 
-      <div className="w-full max-w-md z-10">
-        <div className="flex flex-col items-center mb-8">
-          <div className="p-3 bg-purple-600/15 rounded-2xl border border-purple-500/20 mb-4 pulse-glow">
-            <Tv className="w-10 h-10 text-purple-400" />
+      <div className="w-full max-w-md z-10 animate-fade-in">
+        <div className="flex flex-col items-center mb-8 text-center">
+          <div className="relative mb-5">
+            <div className="absolute inset-0 rounded-2xl bg-purple-500/25 blur-2xl" />
+            <div className="relative p-4 cinema-glass rounded-2xl border border-purple-500/30 pulse-glow">
+              <Tv className="w-11 h-11 text-purple-300" />
+            </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2 bg-gradient-to-r from-purple-400 to-accent bg-clip-text text-transparent">
-            Private Cinema
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+            <span className="bg-gradient-to-r from-purple-300 via-violet-200 to-pink-300 bg-clip-text text-transparent">
+              Private Cinema
+            </span>
           </h1>
-          <p className="text-gray-400 text-sm">
-            Sign in to watch together & chat in private
+          <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
+            Watch together in perfect sync — chat and call in your own theater.
           </p>
+
+          <div className="flex flex-wrap justify-center gap-2 mt-5">
+            {FEATURES.map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-white/5 border border-white/8 text-gray-400"
+              >
+                <Icon className="w-3 h-3 text-purple-400" />
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <div className="bg-[#121217] border border-white/5 p-8 rounded-3xl shadow-2xl backdrop-blur-md">
+        <div className="cinema-card cinema-glass p-6 sm:p-8">
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
+            <div className="mb-5 p-4 bg-red-500/10 border border-red-500/25 rounded-xl flex items-start gap-3 animate-fade-in">
               <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
               <p className="text-sm text-red-200">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Email Address
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                Email
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-500" />
-                </div>
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-black/30 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-sm"
-                  placeholder="e.g. user1@chatweb.com"
+                  className="cinema-input !pl-10"
+                  placeholder="user1@chatweb.com"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-500" />
-                </div>
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-black/30 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all text-sm"
+                  className="cinema-input !pl-10"
                   placeholder="••••••••"
                 />
               </div>
@@ -115,20 +132,23 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center py-3.5 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-purple-500/10 focus:outline-none active:scale-[0.98] text-sm cursor-pointer"
+              className="cinema-btn cinema-btn-primary w-full min-h-[48px] py-3.5 text-base touch-manipulation"
             >
               {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              ) : null}
-              {loading ? 'Authenticating...' : 'Sign In'}
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Enter the theater'
+              )}
             </button>
           </form>
         </div>
-        
-        <div className="mt-8 text-center text-xs text-gray-500 space-y-1">
-          <p>This Cinema room is strictly private and secure.</p>
-          <p>Access credentials must be manually seeded by the system administrator.</p>
-        </div>
+
+        <p className="mt-6 text-center text-[11px] text-gray-600 leading-relaxed px-4">
+          Secure private room · Credentials are issued by your administrator
+        </p>
       </div>
     </div>
   );
