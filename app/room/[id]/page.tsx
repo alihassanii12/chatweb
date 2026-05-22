@@ -9,11 +9,11 @@ import {
 import { apiFetch } from '@/lib/api';
 import { getAccessToken, getApiBase, getStoredUser, getWsBase } from '@/lib/auth';
 import { getCleanEmbedUrl, getYouTubeId, isEmbedUrl } from '@/lib/video';
-import { ChatMessage } from '@/components/ui/ChatMessage';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { CinemaModeToggle } from '@/components/room/CinemaModeToggle';
 import { MobileRoomHeader } from '@/components/room/MobileRoomHeader';
 import { MobileTabBar } from '@/components/room/MobileTabBar';
+import { RoomChatPanel } from '@/components/room/RoomChatPanel';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ChatMsg {
@@ -51,21 +51,6 @@ interface RoomData {
   is_playing: boolean;
   current_time: number;
 }
-
-const EMOJI_CATEGORIES = [
-  {
-    name: 'Smileys',
-    emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🫣', '🤭', '🫢', '🤫', '😶', '😐', '😑', '😬', '🫠', '🙄', '😴', '🤤', '😪', '😵', '😵‍💫', '🤢', '🤮', '🤒', '🤕']
-  },
-  {
-    name: 'Hearts & Fun',
-    emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '💥', '🌟', '✨', '🔥', '💯', '🎉', '🎈', '🍻', '🥂', '🍾', '🍕', '🍿', '🍩', '🍪', '🍫']
-  },
-  {
-    name: 'Hands & Actions',
-    emojis: ['👍', '👎', '👊', '✊', '🤛', '🤜', '🤞', '✌️', '🤟', '🤘', '👌', '🤌', '🤏', '👈', '👉', '👆', '👇', '☝️', '👋', '🤚', '🖐️', '🖖', '👏', '🙌', '👐', '🤲', '🙏', '✍️', '🤳', '💪', '🧠', '👀', '🗣️', '👤']
-  }
-];
 
 export default function RoomPage() {
   const params = useParams();
@@ -589,12 +574,17 @@ export default function RoomPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (activeTab === 'chat') {
-      // Delay slightly to allow keyboard or tab layout transitions to complete
+    if (activeTab === 'chat' || activeTab === 'call') {
       const timer = setTimeout(() => scrollToBottom('auto'), 150);
       return () => clearTimeout(timer);
     }
   }, [viewportStyle.height, activeTab]);
+
+  const handleEmojiPick = (emoji: string) => {
+    const next = chatInput + emoji;
+    setChatInput(next);
+    handleChatInputChange(next);
+  };
 
   // HTML5 Video Action Broadcast
   const broadcastVideoSync = (action: string, time: number, url?: string) => {
@@ -1737,122 +1727,25 @@ export default function RoomPage() {
             </button>
           </div>
 
-          {/* TAB CONTENT: Chat panel */}
           {activeTab === 'chat' && (
-            <div className="flex-1 flex flex-col overflow-hidden h-full">
-              {/* Chat Message Scroll */}
-              <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-2.5 space-y-2">
-                {messages.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 my-auto min-h-[200px]">
-                    <MessageSquare className="w-8 h-8 text-gray-600 mb-2" />
-                    <p className="text-gray-500 text-xs">No messages yet.</p>
-                    <p className="text-gray-600 text-[10px]">Your messages are securely recorded in the database.</p>
-                  </div>
-                ) : (
-                  messages.map((msg, index) => (
-                    <ChatMessage
-                      key={`${msg.id}-${index}`}
-                      content={msg.content}
-                      senderName={msg.sender_name}
-                      isSelf={msg.sender_name === user.username}
-                      isSystem={msg.sender_name === 'System'}
-                      compact={isMobile}
-                    />
-                  ))
-                )}
-                {partnerIsTyping && (
-                  <div className="flex flex-col animate-fade-in items-start py-1 shrink-0">
-                    <div className="flex items-center gap-1.5 mb-1 px-1">
-                      <span className="text-[10px] text-purple-400 font-bold">{partnerUsername || 'Partner'}</span>
-                      <span className="text-[9px] text-gray-500 italic">is typing...</span>
-                    </div>
-                    <div className="px-4 py-3 bg-white/5 border border-white/5 rounded-2xl rounded-tl-none flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              {/* Chat Input form */}
-              <form onSubmit={handleSendChat} className="p-2 border-t border-white/5 shrink-0 flex gap-1.5 relative safe-bottom lg:pb-2">
-                {/* Emoji Picker Drawer */}
-                {showEmojiPicker && (
-                  <div className="emoji-picker-container absolute bottom-[calc(100%+8px)] left-2 right-2 sm:left-3 sm:right-3 bg-[#16161f]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-30 p-3 max-h-[min(42dvh,280px)] flex flex-col overflow-hidden animate-fade-in">
-                    <div className="flex justify-between items-center pb-2 border-b border-white/5 mb-2 shrink-0">
-                      <span className="text-[10px] font-extrabold tracking-wider text-purple-400 uppercase">Express Yourself</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowEmojiPicker(false)}
-                        className="text-[10px] text-gray-500 hover:text-white px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 transition-all"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
-                      {EMOJI_CATEGORIES.map((category, catIndex) => (
-                        <div key={catIndex} className="space-y-1">
-                          <h4 className="text-[9px] font-bold text-gray-500 px-1">{category.name}</h4>
-                          <div className="grid grid-cols-8 gap-1">
-                            {category.emojis.map((emoji, emojiIndex) => (
-                              <button
-                                key={emojiIndex}
-                                type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onTouchStart={(e) => e.preventDefault()}
-                                onClick={() => {
-                                  setChatInput(prev => prev + emoji);
-                                  handleChatInputChange(chatInput + emoji);
-                                }}
-                                className="w-8 h-8 flex items-center justify-center text-base hover:bg-white/10 rounded"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <input
-                  ref={chatInputRef}
-                  type="text"
-                  enterKeyHint="send"
-                  value={chatInput}
-                  onChange={(e) => handleChatInputChange(e.target.value)}
-                  placeholder="Type a message..."
-                  className="cinema-input flex-1 text-sm"
-                />
-
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onTouchStart={(e) => e.preventDefault()}
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className={`p-1.5 rounded border border-white/5 shrink-0 ${
-                    showEmojiPicker ? 'text-purple-400' : 'text-gray-600'
-                  }`}
-                  aria-label="Emoji"
-                >
-                  <Smile className="w-4 h-4" />
-                </button>
-
-              <button
-                type="submit"
-                disabled={!chatInput.trim()}
-                onMouseDown={(e) => e.preventDefault()}
-                onTouchStart={(e) => e.preventDefault()}
-                className="cinema-btn cinema-btn-primary shrink-0 !px-2"
-                aria-label="Send"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-              </form>
-            </div>
+            <RoomChatPanel
+              className="flex-1 h-full"
+              messages={messages}
+              username={user.username}
+              partnerUsername={partnerUsername}
+              partnerIsTyping={partnerIsTyping}
+              compact={isMobile}
+              chatInput={chatInput}
+              onChatInputChange={handleChatInputChange}
+              onSendChat={handleSendChat}
+              showEmojiPicker={showEmojiPicker}
+              onToggleEmojiPicker={() => setShowEmojiPicker(!showEmojiPicker)}
+              onEmojiPick={handleEmojiPick}
+              chatContainerRef={chatContainerRef}
+              chatInputRef={chatInputRef}
+              chatEndRef={chatEndRef}
+              placeholder="Type a message…"
+            />
           )}
 
           {/* TAB CONTENT: Persistent Room Media Library history (with DELETE operations) */}
@@ -1949,98 +1842,98 @@ export default function RoomPage() {
             </div>
           )}
 
-          {/* TAB CONTENT: Live WebRTC Video Call */}
+          {/* Call + chat together */}
           {activeTab === 'call' && (
-            <div className="flex-1 p-4 flex flex-col justify-between overflow-y-auto h-full bg-black/10">
-              {/* Feeds Viewbox */}
-              <div className="flex-1 flex flex-col gap-4 items-stretch mb-4 justify-center">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="shrink-0 border-b border-white/5 p-2 space-y-2 bg-black/20">
                 {inCall ? (
-                  <div className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-black shadow-2xl mobile-player-height lg:aspect-video lg:h-auto max-lg:min-h-[220px]">
-                    <video
-                      ref={remoteVideoRef}
-                      autoPlay
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-black/70 rounded-lg border border-white/10 text-[10px] text-gray-200 font-semibold backdrop-blur-md max-w-[60%] truncate">
-                      {partnerUsername ?? 'Partner'}
-                    </div>
-                    <div className="absolute bottom-3 right-3 w-[30%] min-w-[96px] max-w-[120px] aspect-[3/4] rounded-xl overflow-hidden border-2 border-purple-500/40 shadow-xl bg-black">
+                  <>
+                    <div className="relative w-full h-[clamp(120px,26dvh,200px)] rounded-lg overflow-hidden border border-white/10 bg-black">
                       <video
-                        ref={localVideoRef}
+                        ref={remoteVideoRef}
                         autoPlay
                         playsInline
-                        muted
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-purple-600/90 rounded text-[8px] text-white font-bold">
-                        You
+                      <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 rounded text-[9px] text-gray-300 max-w-[55%] truncate">
+                        {partnerUsername ?? 'Partner'}
+                      </div>
+                      <div className="absolute bottom-2 right-2 w-[72px] aspect-[3/4] rounded-lg overflow-hidden border border-purple-500/40 bg-black">
+                        <video
+                          ref={localVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     </div>
-                  </div>
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={toggleMic}
+                        className={`flex-1 py-1.5 border rounded text-[10px] flex items-center justify-center ${
+                          micMuted
+                            ? 'border-red-500/30 text-red-400 bg-red-500/10'
+                            : 'border-white/5 text-gray-500 bg-white/5'
+                        }`}
+                      >
+                        {micMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleVideo}
+                        className={`flex-1 py-1.5 border rounded text-[10px] flex items-center justify-center ${
+                          videoMuted
+                            ? 'border-red-500/30 text-red-400 bg-red-500/10'
+                            : 'border-white/5 text-gray-500 bg-white/5'
+                        }`}
+                      >
+                        {videoMuted ? <VideoOff className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={endCall}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded text-[10px] font-medium"
+                      >
+                        End
+                      </button>
+                    </div>
+                  </>
                 ) : (
-                  <div className="text-center p-8 border border-dashed border-white/10 rounded-2xl">
-                    <Video className="w-10 h-10 text-gray-700 mx-auto mb-3 animate-pulse" />
-                    <h4 className="text-white text-sm font-bold mb-1">Start Private Stream</h4>
-                    <p className="text-gray-500 text-xs leading-relaxed max-w-[200px] mx-auto">
-                      Initiate a low-latency WebRTC P2P direct voice/video call with your connected partner.
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={startCall}
+                      disabled={!partnerUsername}
+                      className="cinema-btn cinema-btn-success shrink-0"
+                    >
+                      <Video className="w-4 h-4" />
+                      Start call
+                    </button>
+                    <span className="text-[10px] text-gray-600 truncate flex-1">{callStatus}</span>
                   </div>
                 )}
               </div>
 
-              {/* Status Indicator */}
-              <div className="mb-4 shrink-0 flex items-center justify-center gap-2 p-2 bg-white/5 border border-white/5 rounded-xl text-[10px] text-gray-400 font-semibold tracking-wide">
-                <AlertCircle className="w-4 h-4 text-purple-400 shrink-0" />
-                <span className="truncate">Call Status: {callStatus}</span>
-              </div>
-
-              {/* Controls panel */}
-              <div className="shrink-0 space-y-3">
-                {inCall ? (
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={toggleMic}
-                      className={`flex-1 py-1.5 border rounded text-[10px] flex items-center justify-center gap-1 ${
-                        micMuted
-                          ? 'border-red-500/30 text-red-400 bg-red-500/10'
-                          : 'border-white/5 text-gray-400 bg-white/5'
-                      }`}
-                    >
-                      {micMuted ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={toggleVideo}
-                      className={`flex-1 py-1.5 border rounded text-[10px] flex items-center justify-center gap-1 ${
-                        videoMuted
-                          ? 'border-red-500/30 text-red-400 bg-red-500/10'
-                          : 'border-white/5 text-gray-400 bg-white/5'
-                      }`}
-                    >
-                      {videoMuted ? <VideoOff className="w-3 h-3" /> : <Video className="w-3 h-3" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={endCall}
-                      className="px-3 py-1.5 bg-red-600 text-white rounded text-[10px] font-medium"
-                    >
-                      End
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={startCall}
-                    disabled={!partnerUsername}
-                    className="w-full cinema-btn cinema-btn-success !py-2 text-xs"
-                  >
-                    <Video className="w-4 h-4" />
-                    <span>Start Video Call</span>
-                  </button>
-                )}
-              </div>
+              <RoomChatPanel
+                className="flex-1 min-h-0"
+                messages={messages}
+                username={user.username}
+                partnerUsername={partnerUsername}
+                partnerIsTyping={partnerIsTyping}
+                compact={isMobile}
+                chatInput={chatInput}
+                onChatInputChange={handleChatInputChange}
+                onSendChat={handleSendChat}
+                showEmojiPicker={showEmojiPicker}
+                onToggleEmojiPicker={() => setShowEmojiPicker(!showEmojiPicker)}
+                onEmojiPick={handleEmojiPick}
+                chatContainerRef={chatContainerRef}
+                chatInputRef={chatInputRef}
+                chatEndRef={chatEndRef}
+                placeholder="Chat during call…"
+              />
             </div>
           )}
         </aside>
