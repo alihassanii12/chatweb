@@ -12,17 +12,14 @@ type MobileTabBarProps = {
 
 const TABS: { id: RoomTab; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
-  { id: 'library', label: 'Library', icon: Film },
+  { id: 'library', label: 'List', icon: Film },
   { id: 'call', label: 'Call', icon: Video },
 ];
 
 export function MobileTabBar({ activeTab, onTabChange, showTypingDot }: MobileTabBarProps) {
   return (
-    <nav
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-50 cinema-glass border-t border-white/10 safe-bottom"
-      aria-label="Room sections"
-    >
-      <div className="flex items-stretch">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-white/5 bg-[#0a0a0c]/95 safe-bottom">
+      <div className="flex h-11">
         {TABS.map(({ id, label, icon: Icon }) => {
           const active = activeTab === id;
           return (
@@ -30,17 +27,14 @@ export function MobileTabBar({ activeTab, onTabChange, showTypingDot }: MobileTa
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`relative flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 touch-manipulation transition-colors ${
-                active ? 'text-purple-300' : 'text-gray-500 active:bg-white/5'
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0 ${
+                active ? 'text-purple-400' : 'text-gray-600'
               }`}
             >
-              <Icon className={`w-5 h-5 ${active ? 'text-purple-400' : ''}`} />
-              <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+              <Icon className="w-4 h-4" />
+              <span className="text-[9px] font-medium">{label}</span>
               {id === 'chat' && showTypingDot && !active && (
-                <span className="absolute top-2 right-[calc(50%-20px)] w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-              )}
-              {active && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-purple-500 rounded-full" />
+                <span className="absolute top-1.5 right-1/4 w-1.5 h-1.5 rounded-full bg-purple-500" />
               )}
             </button>
           );

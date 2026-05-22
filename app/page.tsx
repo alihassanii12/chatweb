@@ -20,9 +20,6 @@ export default function HomePage() {
   }, [router]);
 
   return (
-    <LoadingScreen
-      title="Private Cinema"
-      subtitle="Opening the shared cinema hall..."
-    />
+    <LoadingScreen title="Cinema" subtitle="Opening room…" />
   );
 }
