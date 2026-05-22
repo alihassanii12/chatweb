@@ -8,19 +8,30 @@ type MobileTabBarProps = {
   activeTab: RoomTab;
   onTabChange: (tab: RoomTab) => void;
   showTypingDot?: boolean;
+  /** Library tab only when cinema / watch mode is on */
+  cinemaMode?: boolean;
 };
 
-const TABS: { id: RoomTab; label: string; icon: typeof MessageSquare }[] = [
+const BASE_TABS: { id: RoomTab; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
-  { id: 'library', label: 'Library', icon: Film },
   { id: 'call', label: 'Call', icon: Video },
 ];
 
-/** Inline tabs at top of panel — not fixed to screen bottom */
-export function MobileTabBar({ activeTab, onTabChange, showTypingDot }: MobileTabBarProps) {
+const LIBRARY_TAB = { id: 'library' as const, label: 'Library', icon: Film };
+
+export function MobileTabBar({
+  activeTab,
+  onTabChange,
+  showTypingDot,
+  cinemaMode = false,
+}: MobileTabBarProps) {
+  const tabs = cinemaMode
+    ? [BASE_TABS[0], LIBRARY_TAB, BASE_TABS[1]]
+    : BASE_TABS;
+
   return (
     <nav className="lg:hidden flex border-b border-white/5 shrink-0 bg-[#0a0a0c]">
-      {TABS.map(({ id, label, icon: Icon }) => {
+      {tabs.map(({ id, label, icon: Icon }) => {
         const active = activeTab === id;
         return (
           <button
